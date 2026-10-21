@@ -388,7 +388,7 @@ class RainTile : public tessera::Tile {
     tile_ = c.tile;
     snprintf(name_, sizeof(name_), "%s", c.name ? c.name : "");
     latitude_ = c.options["latitude"] | 52.1f;
-    longitude_ = c.options["longitude"] | 5.18f;
+    longitude_ = c.options["longitude"] | 5.2f;
     pace_ = std::max(1, std::min(10, c.options["pace"] | 2));
     const std::string play = c.options["play"] | "all";
     play_ = play == "still" ? Play::STILL : play == "forecast" ? Play::FORECAST : Play::ALL;
@@ -421,16 +421,12 @@ class RainTile : public tessera::Tile {
       const int top = mh + gap + title + body + gap;
       graph_.make(c.parent, 0, top, w, h - top, true);
     } else if (c.columns == 1 && c.rows == 1) {
-      // One cell: the words alone, over two lines and the second line under them, in the middle. A graph does not fit.
-      const Font big = h >= 2 * ui::line_height(Font::TITLE) + 2 * ui::line_height(Font::BODY) ? Font::TITLE : Font::BODY_LARGE;
-      const int lines = 2 * ui::line_height(big), sub = 2 * ui::line_height(Font::BODY);
-      const int top = std::max(0, (h - lines - sub) / 2);
-      head_ = ui::text(c.parent, big, theme::INK);
-      lv_obj_set_size(head_, w, lines);
-      lv_obj_set_pos(head_, 0, top);
+      // One cell: the words alone, in the middle (place_words, once their length is known). A graph does not fit.
+      big_ = h >= 2 * ui::line_height(Font::TITLE) + 2 * ui::line_height(Font::BODY) ? Font::TITLE : Font::BODY_LARGE;
+      head_ = ui::text(c.parent, big_, theme::INK);
       sub_ = ui::text(c.parent, Font::BODY, theme::MUTED);
-      lv_obj_set_size(sub_, w, std::min(sub, h - top - lines));
-      lv_obj_set_pos(sub_, 0, top + lines);
+      width_ = w;
+      height_ = h;
       one_cell_ = true;
     } else {
       // The graph alone: the words on top, the graph under them with the hours.
@@ -513,6 +509,17 @@ class RainTile : public tessera::Tile {
     lv_obj_set_pos(sub_, x, y + title);
   }
 
+  // One cell: the heading and the line under it each over the lines their words need, together in the middle.
+  void place_words(const std::string &head, const std::string &sub) {
+    const int hl = ui::text_width(head, big_) > width_ ? 2 : 1, sl = ui::text_width(sub, Font::BODY) > width_ ? 2 : 1;
+    const int hh = hl * ui::line_height(big_), sh = sl * ui::line_height(Font::BODY), gap = ui::px(4);
+    const int top = std::max(0, (height_ - hh - gap - sh) / 2);
+    lv_obj_set_size(head_, width_, hh);
+    lv_obj_set_pos(head_, 0, top);
+    lv_obj_set_size(sub_, width_, std::max(1, std::min(sh, height_ - top - hh - gap)));
+    lv_obj_set_pos(sub_, 0, top + hh + gap);
+  }
+
   void paint() {
     const Summary s = summarise(plugin_, forecast_, now_);
     if (head_) ui::set_text(head_, s.head);
@@ -522,6 +529,7 @@ class RainTile : public tessera::Tile {
       std::string sub = s.sub.empty() ? source : s.sub + " · " + source;
       if (one_cell_) sub = s.rain_later && s.minutes > 0 && !forecast_.stale ? tessera::format(plugin_->text("rain_in"), s.minutes) : source;
       ui::set_text(sub_, sub);
+      if (one_cell_) place_words(s.head, sub);
     }
     const uint32_t cursor = map_ && newest_ ? frame_time(newest_, frame_) : 0;
     graph_.paint(plugin_, forecast_, now_, cursor);
@@ -531,10 +539,12 @@ class RainTile : public tessera::Tile {
   Buienradar *plugin_;
   int tile_ = -1;
   char name_[48] = {};
-  float latitude_ = 52.1f, longitude_ = 5.18f;
+  float latitude_ = 52.1f, longitude_ = 5.2f;
   int pace_ = 2;
   Play play_ = Play::ALL;
   bool map_ = false, one_cell_ = false;
+  Font big_ = Font::BODY_LARGE;
+  int width_ = 1, height_ = 1;
   int frame_ = 0;
   uint32_t now_ = 0, newest_ = 0, minute_ = 0, moved_ = 0;
   Forecast forecast_;
@@ -758,7 +768,7 @@ class RadarCard : public tessera::Card {
 
   Buienradar *plugin_;
   int frame_ = 0, pace_ = 2, key_ = 1, keys_x_ = 0, keys_y_ = 0;
-  bool has_map_ = false, playing_ = false;
+  bool has_map_ = false, playing_ = true;   // the card plays when it opens, as the tile's map does
   uint32_t now_ = 0, newest_ = 0, minute_ = 0, moved_ = 0;
   Forecast forecast_;
   Graph graph_;

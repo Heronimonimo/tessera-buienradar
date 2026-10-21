@@ -16,7 +16,7 @@ A screen without pictures (the CYD, the Waveshare 3.5-inch, the Hosyond 4-inch) 
 
 1. Add the plugin to a screen in Tessera. The screen builds once.
 2. In Layout, place the **Rain radar** tile from the library's Plugins group. Make it 3x2 or larger for the map.
-3. In the inspector, fill in the **Latitude** and **Longitude** of the place, such as `52.10` and `5.18`. Home
+3. In the inspector, fill in the **Latitude** and **Longitude** of the place, to one decimal, such as `52.1` and `5.2` (about 10 km). Home
    Assistant shows the coordinates of your home under Settings, Areas, labels and zones. The graph and the dot on the
    map both use these.
 4. Choose what the map plays, and how long each frame stays.

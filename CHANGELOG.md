@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2 - 2026-10-21
+- The card plays the map as soon as it opens; the key in the middle stops it.
+- Latitude and longitude step by 0.1 in the inspector.
+- A 1x1 tile sets its words in the middle, each over the lines it needs.
+
 ## 0.2.1 - 2026-10-21
 - The map no longer goes blank for a while every five minutes: the forecast frames come from a Buienradar forecast
   that is always published, not one that sometimes was not there yet.

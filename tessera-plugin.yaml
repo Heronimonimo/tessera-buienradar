@@ -2,7 +2,7 @@
 # its radar map as well, playing from half an hour ago to two hours ahead. Every field is explained in the plugins
 # repository's docs/MANIFEST.md.
 id: buienradar
-version: 0.2.1
+version: 0.2.2
 api: "0.14"
 icon: weather-pouring
 maintainer: Heronimonimo
@@ -34,8 +34,8 @@ tiles:
     data: rain
     example: tile_example
     options:
-      - { id: latitude, kind: number, min: 49.5, max: 54.8, step: 0.01, default: 52.1, label: latitude, hint: latitude_hint }
-      - { id: longitude, kind: number, min: 0, max: 10, step: 0.01, default: 5.18, label: longitude, hint: longitude_hint }
+      - { id: latitude, kind: number, min: 49.5, max: 54.8, step: 0.1, default: 52.1, label: latitude, hint: latitude_hint }
+      - { id: longitude, kind: number, min: 0, max: 10, step: 0.1, default: 5.2, label: longitude, hint: longitude_hint }
       - { id: map, kind: toggle, default: true, label: map, hint: map_hint }
       - { id: play, kind: choice, default: all, label: play, hint: play_hint,
           choices: [{ value: all, label: play_all }, { value: forecast, label: play_forecast },
