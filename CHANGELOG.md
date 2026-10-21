@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2 - 2026-10-21
+- When Buienradar does not answer (a few minutes without internet), the tile keeps its last forecast, says it is
+  older, and the map keeps playing the frames it already has instead of going blank.
+
 ## 0.3.1 - 2026-10-21
 - "Buienradar does not answer" is gone for a place on a whole degree (52.0, 5.0): Buienradar only answers a
   coordinate written in its shortest form, and the list now sends it so. Choose the place again if the tile says it.

@@ -28,6 +28,8 @@ A screen without pictures (the CYD, the Waveshare 3.5-inch, the Hosyond 4-inch) 
 - The newest radar frame is ten to fifteen minutes behind the clock, so it is always there to fetch. The forecast
   frames after it come from Buienradar's forecast made ten minutes before that one, which is always published by
   then, and reach about an hour and fifty minutes past the newest frame.
+- Without internet for a while, the tile keeps its last forecast and says it is older, and the map keeps playing
+  the frames it already had. Both catch up by themselves when Buienradar answers again.
 - The map is Buienradar's own background for its radar, the very area of the radar frames: the Netherlands, Belgium
   and the land and sea around them, as one view. It does not zoom in on the place yet.
 - The place is two choices for now, not a number to type: the editor's number steps add up to values such as

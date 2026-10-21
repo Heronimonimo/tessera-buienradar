@@ -115,9 +115,18 @@ struct Forecast {
   bool stale = false;
   char wait[16] = {};
 
-  void read(JsonObjectConst data) {
+  // `now`: the screen's clock, to tell whether a forecast kept from before still reaches the future.
+  void read(JsonObjectConst data, uint32_t now) {
     snprintf(wait, sizeof(wait), "%s", data["wait"] | "");
     stale = data["stale"] | false;
+    // No answer this time and none the app kept (it restarted, or the place changed): the forecast this tile showed
+    // stays, said to be older, as long as it still reaches past now. A place changed makes a new tile, so it is never
+    // another place's forecast.
+    const bool answered = data["items"].is<JsonArrayConst>() && data["items"].size() > 0;
+    if (!answered && n > 0 && (!now || at[n - 1] + STEP > now)) {
+      stale = true;
+      return;
+    }
     n = 0;
     for (JsonObjectConst item : data["items"].as<JsonArrayConst>()) {
       const uint32_t t = item["at"] | 0u;
@@ -458,14 +467,16 @@ class RainTile : public tessera::Tile {
   }
 
   void on_state(JsonObjectConst data) override {
-    forecast_.read(data);
+    forecast_.read(data, now_ ? now_ : tessera::epoch());
     paint();
   }
 
   void on_tick(uint32_t epoch) override {
     now_ = epoch;
     bool changed = false;
-    const uint32_t newest = newest_frame(epoch);
+    // While Buienradar does not answer (the forecast is older), the map keeps the frames it has: the app still has
+    // those, newer ones would not come and would leave the map blank.
+    const uint32_t newest = newest_ && forecast_.stale ? newest_ : newest_frame(epoch);
     if (newest != newest_) {
       newest_ = newest;
       changed = true;
@@ -703,14 +714,16 @@ class RadarCard : public tessera::Card {
   }
 
   void on_state(JsonObjectConst data) override {
-    forecast_.read(data);
+    forecast_.read(data, now_ ? now_ : tessera::epoch());
     paint();
   }
 
   void on_tick(uint32_t epoch) override {
     now_ = epoch;
     bool changed = false;
-    const uint32_t newest = newest_frame(epoch);
+    // While Buienradar does not answer (the forecast is older), the map keeps the frames it has: the app still has
+    // those, newer ones would not come and would leave the map blank.
+    const uint32_t newest = newest_ && forecast_.stale ? newest_ : newest_frame(epoch);
     if (newest != newest_) {
       newest_ = newest;
       changed = true;
