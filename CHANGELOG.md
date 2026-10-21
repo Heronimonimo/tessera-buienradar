@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 - 2026-10-21
+- Latitude and longitude are now chosen from a list in steps of 0.1, always shown with one decimal. Choose your
+  place again after this update: the tile starts at De Bilt (52.1, 5.2).
+- A tile one row high shows the words at the left and the graph beside them.
+- The words beside a graph or a map take only the lines they need.
+
 ## 0.2.2 - 2026-10-21
 - The card plays the map as soon as it opens; the key in the middle stops it.
 - Latitude and longitude step by 0.1 in the inspector.
