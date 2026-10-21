@@ -2,7 +2,7 @@
 # its radar map as well, playing from half an hour ago to two hours ahead. Every field is explained in the plugins
 # repository's docs/MANIFEST.md.
 id: buienradar
-version: 0.1.0
+version: 0.1.1
 api: "0.14"
 icon: weather-pouring
 maintainer: Heronimonimo
@@ -15,9 +15,9 @@ boards: any
 flash_kb: 14
 
 permissions:
-  # The graph from Buienradar's forecast for one point, the radar frames from its picture host, the map under them from
-  # its tile host.
-  network: [graphdata.buienradar.nl, processing-cdn.buienradar.nl, tiles.buienradar.nl]
+  # The graph from Buienradar's forecast for one point, the radar frames from its picture host, the map under them (its
+  # radar page's own background, the frames' very area) from its resource host.
+  network: [graphdata.buienradar.nl, processing-cdn.buienradar.nl, cdn.buienradar.nl]
 attributes: [cloud]
 privacy: https://github.com/Heronimonimo/tessera-buienradar#privacy
 
@@ -27,10 +27,10 @@ tiles:
     name: tile_name
     icon: weather-pouring
     sizes: { min: 1x1, max: 4x4 }
-    # The graph's bars, its lines and labels, the words, the map's five places, the marker and the badge.
-    memory: 5200
-    # Four map tiles and the radar frame over them.
-    pictures: 5
+    # The graph's bars, its lines and labels, the words, the map's two places, the marker and the badge.
+    memory: 4900
+    # The map and the radar frame over it.
+    pictures: 2
     data: rain
     example: tile_example
     options:
@@ -44,7 +44,7 @@ tiles:
 
 cards:
   # The map and the graph together over the whole glass; the graph is the timeline.
-  - { id: radar, name: card_name, wide: true, pictures: 5 }
+  - { id: radar, name: card_name, wide: true, pictures: 2 }
 
 fetch:
   # Buienradar's rain for one point, every five minutes from about twenty minutes ago to two and a half hours ahead,

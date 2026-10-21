@@ -27,7 +27,8 @@ A screen without pictures (the CYD, the Waveshare 3.5-inch, the Hosyond 4-inch) 
   free for private use with the source named, which the tile does.
 - The newest radar frame is about ten minutes behind the clock; the forecast frames after it are Buienradar's
   forecast made at that moment.
-- The map covers the Netherlands and Belgium as one view. It does not zoom in on the place yet.
+- The map is Buienradar's own background for its radar, the very area of the radar frames: the Netherlands, Belgium
+  and the land and sea around them, as one view. It does not zoom in on the place yet.
 - The place is two numbers for now. Choosing a zone or a person from Home Assistant needs a change in Tessera that
   lets a fetch use an entity's coordinates.
 
@@ -35,7 +36,7 @@ A screen without pictures (the CYD, the Waveshare 3.5-inch, the Hosyond 4-inch) 
 
 Tessera's app, in your Home Assistant, asks Buienradar for the forecast every five minutes, with the latitude and
 longitude you filled in (`graphdata.buienradar.nl`). It fetches the radar frames (`processing-cdn.buienradar.nl`) and
-the map tiles (`tiles.buienradar.nl`), which are the same for everyone. Buienradar sees your Home Assistant's address
+the map under them (`cdn.buienradar.nl`), which are the same for everyone. Buienradar sees your Home Assistant's address
 on the internet and the place you chose. The screen itself connects to nothing outside your home.
 
 Buienradar is a service of DPG Media; see its [privacy statement](https://www.buienradar.nl/privacy).

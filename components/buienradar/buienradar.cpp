@@ -26,10 +26,14 @@ static constexpr float RAIN = 0.1f;
 static constexpr int FIRST_FRAME = -2, LAST_FRAME = 24;
 static constexpr uint32_t LAG = 600;
 
-// The map: the four tiles of zoom level 6 around the Netherlands (x 32 and 33, y 20 and 21), 512 pixels a side, and
-// where Buienradar's radar frames lie on them (longitude 0 to 10, latitude 49.5 to 54.8 in Web Mercator).
-static constexpr int TILE_X = 32, TILE_Y = 20, BLOCK = 512;
-static constexpr float RADAR_X0 = 0.0f, RADAR_Y0 = 78.1f, RADAR_X1 = 455.1f, RADAR_Y1 = 471.8f;
+// The map: Buienradar's own background for its radar, the very area of the radar frames (longitude 0 to 10, latitude
+// 49.5 to 54.8, in Web Mercator), 1058 by 916 pixels as the frames are 1058 by 915. Its radar page names it
+// "MapWebmercatorNL?size=Full"; the image API answers that with a redirect to this file, which the app does not follow.
+static const char *const BACKGROUND = "https://cdn.buienradar.nl/resources/image-api-backgrounds/map-nl-1058x916-webmercator_full.jpg";
+static constexpr int MAP_W = 1058, MAP_H = 916;
+// A tile or card at least this many percent as wide as high has the map beside the graph, else above it.
+static constexpr int WIDE = 125;
+static constexpr float WEST = 0.0f, EAST = 10.0f, NORTH = 54.8f, SOUTH = 49.5f;
 
 // Icons of Tessera's set.
 static constexpr uint32_t ICON_PLAY = 0xF040A, ICON_PAUSE = 0xF03E4, ICON_PREVIOUS = 0xF0141, ICON_NEXT = 0xF0142;
@@ -77,12 +81,6 @@ static std::string frame_url(uint32_t newest, int frame) {
   if (frame <= 0) return "https://processing-cdn.buienradar.nl/processing/nl/rain/current/webm/" + stamp(t) + ".png";
   return "https://processing-cdn.buienradar.nl/processing/nl/rain/forecast/runs/webm/" + stamp(newest) + "/" +
          stamp(t) + ".png";
-}
-
-static std::string tile_url(int x, int y) {
-  char out[64];
-  snprintf(out, sizeof(out), "https://tiles.buienradar.nl/tiles-eu-v3/6/%d/%d.png", x, y);
-  return out;
 }
 
 static std::string millimetres(float mm) {
@@ -284,28 +282,28 @@ class Graph {
   lv_obj_t *labels_[3] = {};
 };
 
-// ---- The map: four map tiles, the radar frame over them, a dot at the place, the frame's time in a corner ----
+// ---- The map: Buienradar's background, the radar frame over it, a dot at the place, the frame's time in a corner ----
 
 class Map {
  public:
-  void make(lv_obj_t *parent, int x, int y, int side, float latitude, float longitude) {
+  // The largest map of the background's proportions within `room_w` by `room_h`, at x, y.
+  static int fit_width(int room_w, int room_h) { return std::max(2, std::min(room_w, room_h * MAP_W / MAP_H)); }
+  static int height_of(int width) { return std::max(2, width * MAP_H / MAP_W); }
+
+  void make(lv_obj_t *parent, int x, int y, int width, float latitude, float longitude) {
     x_ = x;
     y_ = y;
-    s_ = side & ~1;
-    const int half = s_ / 2;
-    for (int j = 0; j < 2; ++j)
-      for (int i = 0; i < 2; ++i) {
-        lv_obj_t *place = ui::picture(parent);
-        lv_obj_set_size(place, half, half);
-        lv_obj_set_pos(place, x_ + i * half, y_ + j * half);
-        lv_obj_set_style_radius(place, 0, 0);
-        tiles_[j * 2 + i] = place;
-      }
-    // The radar lies over the map: a place made later is painted over the ones before it.
+    w_ = width;
+    h_ = height_of(width);
+    background_ = ui::picture(parent);
+    lv_obj_set_style_radius(background_, 0, 0);
+    lv_obj_set_pos(background_, x_, y_);
+    lv_obj_set_size(background_, w_, h_);
+    // The radar lies over the background, in the same place: a place made later is painted over the ones before it.
     radar_ = ui::picture(parent);
     lv_obj_set_style_radius(radar_, 0, 0);
-    lv_obj_set_pos(radar_, x_ + scaled(RADAR_X0), y_ + scaled(RADAR_Y0));
-    lv_obj_set_size(radar_, scaled(RADAR_X1) - scaled(RADAR_X0), scaled(RADAR_Y1) - scaled(RADAR_Y0));
+    lv_obj_set_pos(radar_, x_, y_);
+    lv_obj_set_size(radar_, w_, h_);
     // The place: a dot with a ring, where the latitude and longitude lie on the map.
     const int ring = std::max(6, ui::mm(2)), dot = std::max(4, ring * 6 / 10);
     ring_ = ui::block(parent, theme::CAMERA_INK);
@@ -314,15 +312,13 @@ class Map {
     lv_obj_set_size(dot_, dot, dot);
     lv_obj_set_style_radius(ring_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_radius(dot_, LV_RADIUS_CIRCLE, 0);
-    const float px = (longitude + 180.0f) / 360.0f * 16384.0f - TILE_X * 256.0f;
-    const float lat = latitude * 3.14159265f / 180.0f;
-    const float py = (1.0f - std::log(std::tan(3.14159265f / 4.0f + lat / 2.0f)) / 3.14159265f) / 2.0f * 16384.0f -
-                     TILE_Y * 256.0f;
-    const bool inside = px >= 0 && py >= 0 && px < BLOCK && py < BLOCK;
+    const float fx = (longitude - WEST) / (EAST - WEST);
+    const float fy = (mercator(NORTH) - mercator(latitude)) / (mercator(NORTH) - mercator(SOUTH));
+    const bool inside = fx >= 0 && fx < 1 && fy >= 0 && fy < 1;
     shown(ring_, inside);
     shown(dot_, inside);
     if (inside) {
-      const int cx = x_ + static_cast<int>(px * s_ / BLOCK), cy = y_ + static_cast<int>(py * s_ / BLOCK);
+      const int cx = x_ + static_cast<int>(fx * w_), cy = y_ + static_cast<int>(fy * h_);
       lv_obj_set_pos(ring_, cx - ring / 2, cy - ring / 2);
       lv_obj_set_pos(dot_, cx - dot / 2, cy - dot / 2);
     }
@@ -330,7 +326,7 @@ class Map {
     badge_ = ui::block(parent, theme::CAMERA_PAGE);
     badge_text_ = ui::label(badge_, Font::BODY, theme::CAMERA_INK);
     lv_obj_set_pos(badge_text_, ui::px(6), 0);
-    for (int k = 0; k < 4; ++k) ui::set_picture(tiles_[k], tile_url(TILE_X + k % 2, TILE_Y + k / 2), Fit::COVER);
+    ui::set_picture(background_, BACKGROUND, Fit::COVER);
     colors();
   }
 
@@ -343,10 +339,10 @@ class Map {
     const uint32_t t = frame_time(newest, frame);
     const std::string words = tessera::clock_text(t) + "  " + relative(p, t, now);
     ui::set_text(badge_text_, words);
-    const int lh = ui::line_height(Font::BODY), w = std::min(s_ - ui::px(8), ui::text_width(words, Font::BODY) + ui::px(12));
+    const int lh = ui::line_height(Font::BODY), w = std::min(w_ - ui::px(8), ui::text_width(words, Font::BODY) + ui::px(12));
     lv_obj_set_size(badge_, w, lh + ui::px(2));
     lv_obj_set_width(badge_text_, w - ui::px(12));
-    lv_obj_set_pos(badge_, x_ + ui::px(4), y_ + s_ - lh - ui::px(6));
+    lv_obj_set_pos(badge_, x_ + ui::px(4), y_ + h_ - lh - ui::px(6));
     shown(badge_, true);
   }
 
@@ -357,13 +353,17 @@ class Map {
     ui::set_color(badge_text_, theme::CAMERA_INK);
   }
 
-  bool hit(const tessera::Point &p) const { return p.x >= x_ && p.x < x_ + s_ && p.y >= y_ && p.y < y_ + s_; }
+  bool hit(const tessera::Point &p) const { return p.x >= x_ && p.x < x_ + w_ && p.y >= y_ && p.y < y_ + h_; }
+  int width() const { return w_; }
+  int height() const { return h_; }
 
  private:
-  int scaled(float block_px) const { return static_cast<int>(block_px * s_ / BLOCK + 0.5f); }
-  int x_ = 0, y_ = 0, s_ = 2;
-  lv_obj_t *tiles_[4] = {};
-  lv_obj_t *radar_ = nullptr, *ring_ = nullptr, *dot_ = nullptr, *badge_ = nullptr, *badge_text_ = nullptr;
+  static float mercator(float latitude) {
+    return std::log(std::tan(3.14159265f / 4.0f + latitude * 3.14159265f / 360.0f));
+  }
+  int x_ = 0, y_ = 0, w_ = 2, h_ = 2;
+  lv_obj_t *background_ = nullptr, *radar_ = nullptr, *ring_ = nullptr, *dot_ = nullptr, *badge_ = nullptr,
+           *badge_text_ = nullptr;
 };
 
 // ---- The tile ----
@@ -388,20 +388,19 @@ class RainTile : public tessera::Tile {
 
     const int w = c.width, h = c.height, gap = ui::px(6);
     const int title = ui::line_height(Font::TITLE), body = ui::line_height(Font::BODY);
-    if (map_ && w >= h) {
-      // Wide: the map at the left, the words beside it, the graph across the bottom.
-      const int graph = std::max(h * 34 / 100, 3 * body);
-      const int side = std::min(h - graph - gap, w * 55 / 100);
-      map_view_.make(c.parent, 0, 0, side, latitude_, longitude_);
-      words(c.parent, side + gap, 0, w - side - gap, title, body);
-      graph_.make(c.parent, 0, side + gap, w, h - side - gap, true);
+    if (map_ && w * 100 >= h * WIDE) {
+      // Wide: the map at the left over the whole height, the words and the graph beside it.
+      const int mw = Map::fit_width(w * 60 / 100, h);
+      map_view_.make(c.parent, 0, (h - Map::height_of(mw)) / 2, mw, latitude_, longitude_);
+      const int x = mw + gap * 2, top = title + body + gap;
+      words(c.parent, x, 0, w - x, title, body);
+      graph_.make(c.parent, x, top, w - x, h - top, true);
     } else if (map_) {
-      // Tall: the map on top, the words under it, the graph at the bottom.
-      const int graph = std::max(h * 25 / 100, 3 * body);
-      const int side = std::min(w, h - graph - title - body - 2 * gap);
-      map_view_.make(c.parent, (w - side) / 2, 0, side, latitude_, longitude_);
-      words(c.parent, 0, side + gap, w, title, body);
-      const int top = side + gap + title + body + gap;
+      // Square or tall: the map on top over the whole width, the words and the graph under it.
+      const int mw = Map::fit_width(w, h * 55 / 100), mh = Map::height_of(mw);
+      map_view_.make(c.parent, (w - mw) / 2, 0, mw, latitude_, longitude_);
+      words(c.parent, 0, mh + gap, w, title, body);
+      const int top = mh + gap + title + body + gap;
       graph_.make(c.parent, 0, top, w, h - top, true);
     } else if (c.columns == 1 && c.rows == 1) {
       // One cell: the words over two lines, a small graph under them.
@@ -527,56 +526,41 @@ class RadarCard : public tessera::Card {
     frame_ = std::max(FIRST_FRAME, std::min(LAST_FRAME, from.frame));
     pace_ = from.pace;
     const int w = c.width, h = c.height, gap = ui::px(10);
-    const int body = ui::line_height(Font::BODY);
-    const int graph = std::max(h * 34 / 100, 4 * body);
-    const int top = h - graph - gap;
-    // Landscape: the map at the left and the words beside it. Standing: the map on top and the words under it.
+    const int body = ui::line_height(Font::BODY), value = ui::line_height(Font::VALUE);
+    // Wide: the map at the left over the whole height, the moment, the keys and the graph beside it. Square or tall:
+    // the map on top over the whole width, the rest under it. The graph takes what the words leave.
     int x = 0, y = 0;
-    const bool standing = h > w;
     if (ui::pictures()) {
       has_map_ = true;
-      if (standing) {
-        const int side = std::min(w, top * 55 / 100);
-        map_view_.make(c.parent, (w - side) / 2, 0, side, from.latitude, from.longitude);
-        y = side + gap;
+      if (w * 100 >= h * WIDE) {
+        const int mw = Map::fit_width(w * 58 / 100, h);
+        map_view_.make(c.parent, 0, (h - Map::height_of(mw)) / 2, mw, from.latitude, from.longitude);
+        x = mw + gap * 2;
       } else {
-        const int side = std::min(top, w / 2);
-        map_view_.make(c.parent, 0, 0, side, from.latitude, from.longitude);
-        x = side + gap * 2;
+        // The map takes what the moment, the words and a graph of at least a third of the room leave.
+        const int key = std::max(ui::mm(9), ui::line_height(Font::ICON) + ui::px(8));
+        const int words = std::max(value + body, key) + ui::px(6) + 2 * body + gap;
+        const int graph = std::max(h * 28 / 100, 4 * body);
+        const int mw = Map::fit_width(w, std::max(2, h - words - graph - gap));
+        map_view_.make(c.parent, (w - mw) / 2, 0, mw, from.latitude, from.longitude);
+        y = map_view_.height() + gap;
       }
     }
     const int cw = std::max(1, w - x);
-    // Three keys: back a frame, play or stop, on a frame. Under the words beside a landscape map, at the right of the
-    // time under a standing one.
-    key_ = std::min(std::max(ui::mm(9), ui::line_height(Font::ICON) + ui::px(8)), (cw - 2 * ui::px(8)) / 3);
-    const int keys_w = 3 * key_ + 2 * ui::px(8);
-    const int time_w = standing ? std::max(1, cw - keys_w - gap) : cw;
-    if (standing) {
-      keys_x_ = w - keys_w;
-      keys_y_ = y;
-    }
     if (has_map_) {
+      // The moment at the left, the three keys beside it at the right: back a frame, play or stop, on a frame.
+      key_ = std::min(std::max(ui::mm(9), ui::line_height(Font::ICON) + ui::px(8)), (cw - 2 * ui::px(8)) / 4);
+      const int keys_w = 3 * key_ + 2 * ui::px(8);
+      keys_x_ = x + cw - keys_w;
+      keys_y_ = y + std::max(0, (value + body - key_) / 2);
+      const int time_w = std::max(1, cw - keys_w - gap);
       time_ = ui::label(c.parent, Font::VALUE, theme::INK);
       lv_obj_set_width(time_, time_w);
       lv_obj_set_pos(time_, x, y);
-      y += ui::line_height(Font::VALUE);
       when_ = ui::label(c.parent, Font::BODY, theme::MUTED);
       lv_obj_set_width(when_, time_w);
-      lv_obj_set_pos(when_, x, y);
-      y += body + ui::px(6);
-      rain_ = ui::label(c.parent, Font::BODY_LARGE, theme::INK);
-      lv_obj_set_width(rain_, cw);
-      lv_obj_set_pos(rain_, x, y);
-      y += ui::line_height(Font::BODY_LARGE) + ui::px(6);
-    }
-    head_ = ui::text(c.parent, Font::BODY, theme::MUTED);
-    lv_obj_set_size(head_, cw, 2 * body);
-    lv_obj_set_pos(head_, x, y);
-    if (has_map_) {
-      if (!standing) {
-        keys_y_ = std::max(y + 2 * body + ui::px(6), top - key_);
-        keys_x_ = x;
-      }
+      lv_obj_set_pos(when_, x, y + value);
+      y += std::max(value + body, key_) + ui::px(6);
       for (int k = 0; k < 3; ++k) {
         keys_[k] = ui::block(c.parent, theme::BUTTON);
         lv_obj_set_size(keys_[k], key_, key_);
@@ -590,7 +574,11 @@ class RadarCard : public tessera::Card {
       ui::set_text(icons_[0], ui::icon(ICON_PREVIOUS));
       ui::set_text(icons_[2], ui::icon(ICON_NEXT));
     }
-    graph_.make(c.parent, 0, top + gap, w, h - top - gap, true);
+    head_ = ui::text(c.parent, Font::BODY, theme::MUTED);
+    lv_obj_set_size(head_, cw, 2 * body);
+    lv_obj_set_pos(head_, x, y);
+    y += 2 * body + gap;
+    graph_.make(c.parent, x, y, cw, std::max(3 * body, h - y), true);
   }
 
   void on_state(JsonObjectConst data) override {
@@ -622,7 +610,7 @@ class RadarCard : public tessera::Card {
   }
 
   void on_theme() override {
-    for (auto *l : {time_, rain_}) if (l) ui::set_color(l, theme::INK);
+    if (time_) ui::set_color(time_, theme::INK);
     for (auto *l : {when_, head_}) if (l) ui::set_color(l, theme::MUTED);
     for (int k = 0; k < 3; ++k) {
       if (keys_[k]) ui::set_fill(keys_[k], Tone::NORMAL, theme::BUTTON);
@@ -670,13 +658,14 @@ class RadarCard : public tessera::Card {
     if (has_map_ && newest_) {
       cursor = frame_time(newest_, frame_);
       ui::set_text(time_, tessera::clock_text(cursor));
-      ui::set_text(when_, relative(plugin_, cursor, now_));
+      // The moment against now, and the rain then at the place: "+15 min · 0.4 mm/h".
+      std::string when = relative(plugin_, cursor, now_);
       if (forecast_.covers(cursor)) {
         const float mm = forecast_.mm[forecast_.index(cursor)];
-        ui::set_text(rain_, mm >= RAIN ? tessera::fill(plugin_->text("mm"), "mm", millimetres(mm)) : plugin_->text("dry"));
-      } else {
-        ui::set_text(rain_, "");
+        when += std::string(" · ") + (mm >= RAIN ? tessera::fill(plugin_->text("mm"), "mm", millimetres(mm))
+                                                 : std::string(plugin_->text("dry")));
       }
+      ui::set_text(when_, when);
       ui::set_text(icons_[1], ui::icon(playing_ ? ICON_PAUSE : ICON_PLAY));
       map_view_.show(plugin_, newest_, frame_, now_);
     }
@@ -690,7 +679,7 @@ class RadarCard : public tessera::Card {
   Forecast forecast_;
   Graph graph_;
   Map map_view_;
-  lv_obj_t *time_ = nullptr, *when_ = nullptr, *rain_ = nullptr, *head_ = nullptr;
+  lv_obj_t *time_ = nullptr, *when_ = nullptr, *head_ = nullptr;
   lv_obj_t *keys_[3] = {}, *icons_[3] = {};
 };
 
