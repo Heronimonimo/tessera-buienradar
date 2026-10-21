@@ -24,7 +24,7 @@ A screen without pictures (the CYD, the Waveshare 3.5-inch, the Hosyond 4-inch) 
 ## Good to know
 
 - The graph and the radar frames are Buienradar's own, the ones its website and its embeddable widget show. They are
-  free for private use with the source named, which the tile does.
+  free for private use with the source named; this README and the plugin's name do.
 - The newest radar frame is ten to fifteen minutes behind the clock, so it is always there to fetch. The forecast
   frames after it come from Buienradar's forecast made ten minutes before that one, which is always published by
   then, and reach about an hour and fifty minutes past the newest frame.

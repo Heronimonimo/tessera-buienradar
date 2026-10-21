@@ -2,7 +2,7 @@
 # its radar map as well, playing from half an hour ago to two hours ahead. Every field is explained in the plugins
 # repository's docs/MANIFEST.md.
 id: buienradar
-version: 0.3.2
+version: 0.3.3
 api: "0.14"
 icon: weather-pouring
 maintainer: Heronimonimo

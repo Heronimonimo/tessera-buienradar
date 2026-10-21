@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.3 - 2026-10-21
+- The graph is linear now: its top is 1, 2, 5, 10 mm/h or more, whatever the heaviest rain of the forecast fits
+  under, so light rain still shows.
+- The card's graph has a scale: lines at 0.5, 2.5 and 10 mm/h with their numbers, the kinds of rain between them
+  (drizzle, light, moderate, heavy rain), and the unit above them. The card names the kind of rain of its moment.
+- The lines between the kinds of rain are dotted.
+- No tile or card ends its line in "Buienradar" any more.
+- The card is titled with the tile's name, as Tessera's own cards are.
+
 ## 0.3.2 - 2026-10-21
 - When Buienradar does not answer (a few minutes without internet), the tile keeps its last forecast, says it is
   older, and the map keeps playing the frames it already has instead of going blank.

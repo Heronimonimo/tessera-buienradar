@@ -195,16 +195,84 @@ static std::string relative(const tessera::Plugin *p, uint32_t t, uint32_t now) 
   return rounded > 0 ? tessera::format(p->text("later"), rounded) : tessera::format(p->text("earlier"), -rounded);
 }
 
+// The graph is linear: its top is the first of these that the heaviest rain of the forecast fits under, so a drizzle
+// still shows and a downpour is not cut off. Lines go across at the half and the top.
+static constexpr float TOPS[] = {1, 2, 5, 10, 20, 50, 100};
+static float top_for(float most) {
+  for (float top : TOPS)
+    if (most <= top) return top;
+  return TOPS[sizeof(TOPS) / sizeof(TOPS[0]) - 1];
+}
+// How high a bar of `mm` an hour stands, as a share of the graph; any rain at all at least a sliver.
+static float share_of(float mm, float top) { return std::min(1.0f, std::max(0.03f, mm / top)); }
+// The kinds of rain, as the KNMI names them: from these many millimetres an hour on. The card's graph draws a line
+// at each boundary with its number, and the kind's name in its band; the card's moment says the kind.
+static constexpr int KINDS = 4;
+static constexpr float KIND_FROM[KINDS] = {0.0f, 0.5f, 2.5f, 10.0f};
+static const char *const KIND_TEXT[KINDS] = {"drizzle", "light", "moderate", "heavy"};
+static int kind_of(float mm) {
+  int k = 0;
+  while (k + 1 < KINDS && mm >= KIND_FROM[k + 1]) ++k;
+  return k;
+}
+// A number of the scale: 0, 0.5, 2.5, 10.
+static std::string scale_text(float mm) {
+  char out[12];
+  snprintf(out, sizeof(out), "%g", mm);
+  return out;
+}
+
 // ---- The graph: a bar per five minutes, a line at now, a cursor at the map's moment, the hours under it ----
 
 class Graph {
  public:
-  void make(lv_obj_t *parent, int x, int y, int w, int h, bool axis) {
+  // `scale`: the card's graph, with the unit over it, lines across at the boundaries of the kinds of rain with their
+  // number at the left, and each kind's name at the right of its band.
+  void make(lv_obj_t *parent, int x, int y, int w, int h, bool axis, const tessera::Plugin *scale = nullptr) {
+    const int body = ui::line_height(Font::BODY);
     x_ = x;
     y_ = y;
     w_ = std::max(1, w);
-    axis_ = axis && h > 3 * ui::line_height(Font::BODY);
-    gh_ = std::max(1, h - (axis_ ? ui::line_height(Font::BODY) : 0));
+    axis_ = axis && h > 3 * body;
+    gh_ = std::max(1, h - (axis_ ? body : 0));
+    if (scale && gh_ > 3 * body) {
+      // The unit over the scale, the numbers right-aligned in a margin at the left, the lines across the bars' room.
+      unit_ = ui::label(parent, Font::BODY, theme::MUTED);
+      lv_obj_set_width(unit_, w_);
+      lv_obj_set_pos(unit_, x_, y_);
+      ui::set_text(unit_, scale->text("unit"));
+      margin_ = ui::text_width("2.5", Font::BODY) + ui::px(8);
+      int names = 0;
+      for (const char *key : KIND_TEXT) names = std::max(names, ui::text_width(scale->text(key), Font::BODY));
+      names_ = names + ui::px(8);
+      y_ += body + ui::px(4);
+      gh_ -= body + ui::px(4);
+      x_ += margin_;
+      w_ = std::max(1, w_ - margin_ - names_);
+      // Laid out in paint(), once the forecast says how high the scale goes.
+      for (int k = 0; k < KINDS; ++k) {
+        // A dotted line across the bars and the names (LVGL's line keeps a pointer to its points: they are members).
+        grid_[k] = lv_line_create(parent);
+        lv_obj_remove_flag(grid_[k], LV_OBJ_FLAG_CLICKABLE);
+        points_[k][0] = {0, 0};
+        points_[k][1] = {static_cast<lv_value_precise_t>(w_ + names_), 0};
+        lv_line_set_points(grid_[k], points_[k], 2);
+        lv_obj_set_style_line_width(grid_[k], std::max(1, ui::px(1)), 0);
+        lv_obj_set_style_line_dash_width(grid_[k], std::max(2, ui::px(3)), 0);
+        lv_obj_set_style_line_dash_gap(grid_[k], std::max(2, ui::px(4)), 0);
+        lv_obj_set_style_line_color(grid_[k], ui::color(theme::MUTED), 0);
+        scale_[k] = ui::label(parent, Font::BODY, theme::MUTED);
+        lv_obj_set_width(scale_[k], margin_ - ui::px(6));
+        lv_obj_set_style_text_align(scale_[k], LV_TEXT_ALIGN_RIGHT, 0);
+        ui::set_text(scale_[k], scale_text(KIND_FROM[k]));
+        kind_[k] = ui::label(parent, Font::BODY, theme::MUTED);
+        lv_obj_set_width(kind_[k], names_ - ui::px(4));
+        ui::set_text(kind_[k], scale->text(KIND_TEXT[k]));
+        shown(grid_[k], false);
+        shown(scale_[k], false);
+        shown(kind_[k], false);
+      }
+    }
     base_ = ui::block(parent, theme::LINE);
     lv_obj_set_style_radius(base_, 0, 0);
     lv_obj_set_size(base_, w_, std::max(1, ui::px(1)));
@@ -234,6 +302,11 @@ class Graph {
     if (!base_) return;   // a tile without a graph (one cell)
     if (!f.n) {
       for (auto *bar : bars_) shown(bar, false);
+      for (int k = 0; k < KINDS; ++k) {
+        shown(grid_[k], false);
+        shown(scale_[k], false);
+        shown(kind_[k], false);
+      }
       shown(now_, false);
       shown(cursor_, false);
       for (auto *l : labels_) if (l) ui::set_text(l, "");
@@ -242,6 +315,29 @@ class Graph {
     }
     t0_ = f.at[0];
     t1_ = f.at[f.n - 1] + STEP;
+    float most = 0;
+    for (int i = 0; i < f.n; ++i) most = std::max(most, f.mm[i]);
+    const float top = top_for(most);
+    if (unit_) {
+      // Each boundary under the top: its line and number; each kind with room in its band: its name in the middle.
+      const int body = ui::line_height(Font::BODY);
+      auto y_of = [&](float mm) { return y_ + gh_ - static_cast<int>(std::min(1.0f, mm / top) * gh_); };
+      int below = y_ + gh_ + body;   // where the number under this one stands; the base line needs no "0"
+      for (int k = 0; k < KINDS; ++k) {
+        const bool under = KIND_FROM[k] < top;
+        const int at = y_of(KIND_FROM[k]);
+        const int number_y = std::min(y_ + gh_ - body, std::max(y_ - body / 2, at - body / 2));
+        const bool number = k > 0 && under && below - number_y >= body;
+        shown(grid_[k], k > 0 && under);
+        if (k > 0) lv_obj_set_pos(grid_[k], x_, at);
+        shown(scale_[k], number);
+        lv_obj_set_pos(scale_[k], x_ - margin_, number_y);
+        if (number) below = number_y;
+        const int upto = k + 1 < KINDS ? y_of(KIND_FROM[k + 1]) : y_;
+        shown(kind_[k], under && at - upto >= body);
+        lv_obj_set_pos(kind_[k], x_ + w_ + ui::px(6), (at + upto - body) / 2);
+      }
+    }
     const int slot = std::max(1, static_cast<int>(static_cast<int64_t>(w_) * STEP / (t1_ - t0_)));
     const int bar_w = std::max(1, slot > 3 ? slot * 3 / 4 : slot);
     for (int i = 0; i < MAX_POINTS; ++i) {
@@ -252,7 +348,7 @@ class Graph {
         continue;
       }
       // A log scale, as Buienradar's graph: a drizzle shows, a downpour does not flatten the rest.
-      const float share = std::min(1.0f, std::max(0.06f, (std::log10(mm) + 1.3f) / 2.3f));
+      const float share = share_of(mm, top);
       const int h = std::max(1, static_cast<int>(share * gh_));
       lv_obj_set_size(bar, bar_w, h);
       lv_obj_set_pos(bar, x_of(f.at[i]) + (slot - bar_w) / 2, y_ + gh_ - h);
@@ -289,6 +385,10 @@ class Graph {
     ui::set_fill(now_, Tone::NORMAL, theme::MUTED);
     ui::set_fill(cursor_, Tone::NORMAL, theme::INK);
     for (auto *l : labels_) if (l) ui::set_color(l, theme::MUTED);
+    for (auto *l : scale_) if (l) ui::set_color(l, theme::MUTED);
+    for (auto *l : kind_) if (l) ui::set_color(l, theme::MUTED);
+    for (auto *g : grid_) if (g) lv_obj_set_style_line_color(g, ui::color(theme::MUTED), 0);
+    if (unit_) ui::set_color(unit_, theme::MUTED);
   }
 
   bool hit(const tessera::Point &p) const {
@@ -309,6 +409,9 @@ class Graph {
   lv_obj_t *bars_[MAX_POINTS] = {};
   lv_obj_t *base_ = nullptr, *now_ = nullptr, *cursor_ = nullptr;
   lv_obj_t *labels_[3] = {};
+  lv_obj_t *grid_[KINDS] = {}, *scale_[KINDS] = {}, *kind_[KINDS] = {}, *unit_ = nullptr;
+  lv_point_precise_t points_[KINDS][2] = {};
+  int margin_ = 0, names_ = 0;
 };
 
 // ---- The map: Buienradar's background, the radar frame over it, a dot at the place, the frame's time in a corner ----
@@ -405,7 +508,6 @@ class RainTile : public tessera::Tile {
 
   void create(const tessera::TileContext &c) override {
     tile_ = c.tile;
-    snprintf(name_, sizeof(name_), "%s", c.name ? c.name : "");
     latitude_ = coordinate(c.options["latitude"], 52.1f);
     longitude_ = coordinate(c.options["longitude"], 5.2f);
     pace_ = std::max(1, std::min(10, c.options["pace"] | 2));
@@ -511,7 +613,8 @@ class RainTile : public tessera::Tile {
     plugin_->handoff.longitude = longitude_;
     plugin_->handoff.frame = map_ ? frame_ : 0;
     plugin_->handoff.pace = pace_;
-    tessera::open_card(plugin_->plugin_id(), "radar", "", tile_, name_[0] ? std::string(name_) : plugin_->text("title"));
+    // No title of its own: Tessera titles the card with the tile's name, as it does its own cards.
+    tessera::open_card(plugin_->plugin_id(), "radar", "", tile_);
   }
 
  private:
@@ -546,8 +649,9 @@ class RainTile : public tessera::Tile {
   // need, together in the middle of their height.
   void place_words(const std::string &head, const std::string &sub) {
     const int hw = ui::text_width(head, big_), sw = ui::text_width(sub, Font::BODY);
-    const int hl = hw > 2 * width_ ? 3 : hw > width_ ? 2 : 1, sl = sw > 2 * width_ ? 3 : sw > width_ ? 2 : 1;
-    const int hh = hl * ui::line_height(big_), sh = sl * ui::line_height(Font::BODY), gap = ui::px(4);
+    const int hl = hw > 2 * width_ ? 3 : hw > width_ ? 2 : 1;
+    const int sl = sub.empty() ? 0 : sw > 2 * width_ ? 3 : sw > width_ ? 2 : 1;
+    const int hh = hl * ui::line_height(big_), sh = sl * ui::line_height(Font::BODY), gap = sl ? ui::px(4) : 0;
     const int top = top_words_ ? 0 : std::max(0, (height_ - hh - gap - sh) / 2);
     lv_obj_set_size(head_, width_, std::min(hh, height_));
     lv_obj_set_pos(head_, words_x_, words_y_ + top);
@@ -559,10 +663,9 @@ class RainTile : public tessera::Tile {
     const Summary s = summarise(plugin_, forecast_, now_);
     if (head_) ui::set_text(head_, s.head);
     if (sub_) {
-      // Buienradar's data is free with its source named: the second line says it, beside how hard it rains.
-      const std::string source = plugin_->text("source");
-      std::string sub = s.sub.empty() ? source : s.sub + " · " + source;
-      if (one_cell_) sub = s.rain_later && s.minutes > 0 && !forecast_.stale ? tessera::format(plugin_->text("rain_in"), s.minutes) : source;
+      // How hard it rains at most (or that the forecast is older); a single cell says when the rain starts instead.
+      std::string sub = s.sub;
+      if (one_cell_ && s.rain_later && s.minutes > 0 && !forecast_.stale) sub = tessera::format(plugin_->text("rain_in"), s.minutes);
       ui::set_text(sub_, sub);
       if (fit_words_) place_words(s.head, sub);
     }
@@ -573,7 +676,6 @@ class RainTile : public tessera::Tile {
 
   Buienradar *plugin_;
   int tile_ = -1;
-  char name_[48] = {};
   float latitude_ = 52.1f, longitude_ = 5.2f;
   int pace_ = 2;
   Play play_ = Play::ALL;
@@ -661,14 +763,14 @@ class RadarCard : public tessera::Card {
     lv_obj_set_size(head_, cw, 2 * body);
     lv_obj_set_pos(head_, x, y);
     y += 2 * body + gap;
-    graph_.make(c.parent, x, y, cw, std::max(3 * body, h - y), true);
+    graph_.make(c.parent, x, y, cw, std::max(3 * body, h - y), true, plugin_);
   }
 
   // The square card: the map, a column beside it with the moment and the three keys in a row under it, the words and
   // the graph across the bottom.
   void open_square(const tessera::CardContext &c, int w, int h, int gap, int body, int value) {
     const Handoff &from = plugin_->handoff;
-    const int graph = std::max(h * 24 / 100, 3 * body + ui::px(8));
+    const int graph = std::max(h * 28 / 100, 5 * body);
     const int top = h - graph - 2 * body - 2 * gap;
     const int column = std::max({ui::text_width("00:00", Font::VALUE) + ui::px(8), 3 * ui::mm(7) + 2 * ui::px(8),
                                  w * 28 / 100});
@@ -702,7 +804,7 @@ class RadarCard : public tessera::Card {
     head_ = ui::text(c.parent, Font::BODY, theme::MUTED);
     lv_obj_set_size(head_, w, 2 * body);
     lv_obj_set_pos(head_, 0, y);
-    graph_.make(c.parent, 0, y + 2 * body + gap, w, std::max(3 * body, h - y - 2 * body - gap), true);
+    graph_.make(c.parent, 0, y + 2 * body + gap, w, std::max(3 * body, h - y - 2 * body - gap), true, plugin_);
   }
 
   // Which of the three keys the finger is on: 0 back, 1 play or stop, 2 on; -1 for none.
@@ -786,7 +888,7 @@ class RadarCard : public tessera::Card {
  private:
   void paint() {
     const Summary s = summarise(plugin_, forecast_, now_);
-    ui::set_text(head_, (s.sub.empty() ? s.head : s.head + ". " + s.sub) + " · " + plugin_->text("source"));
+    ui::set_text(head_, s.sub.empty() ? s.head : s.head + ". " + s.sub);
     uint32_t cursor = 0;
     if (has_map_ && newest_) {
       cursor = frame_time(newest_, frame_);
@@ -795,7 +897,8 @@ class RadarCard : public tessera::Card {
       std::string when = relative(plugin_, cursor, now_);
       if (forecast_.covers(cursor)) {
         const float mm = forecast_.mm[forecast_.index(cursor)];
-        when += std::string(" · ") + (mm >= RAIN ? tessera::fill(plugin_->text("mm"), "mm", millimetres(mm))
+        when += std::string(" · ") + (mm >= RAIN ? std::string(plugin_->text(KIND_TEXT[kind_of(mm)])) + " · " +
+                                                       tessera::fill(plugin_->text("mm"), "mm", millimetres(mm))
                                                  : std::string(plugin_->text("dry")));
       }
       ui::set_text(when_, when);

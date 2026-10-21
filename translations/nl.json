@@ -18,8 +18,11 @@
     "failed": "Buienradar antwoordt niet",
     "not_filled": "Kies de plek in de instellingen van de tegel",
     "stale": "Oudere verwachting",
-    "source": "Buienradar",
-    "title": "Buienradar"
+    "unit": "mm/u",
+    "drizzle": "Motregen",
+    "light": "Lichte regen",
+    "moderate": "Matige regen",
+    "heavy": "Zware regen"
   },
   "app": {
     "name": "Buienradar",

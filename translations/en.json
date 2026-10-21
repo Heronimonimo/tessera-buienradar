@@ -18,8 +18,11 @@
     "failed": "Buienradar does not answer",
     "not_filled": "Set the place in the tile's settings",
     "stale": "Older forecast",
-    "source": "Buienradar",
-    "title": "Rain radar"
+    "unit": "mm/h",
+    "drizzle": "Drizzle",
+    "light": "Light rain",
+    "moderate": "Moderate rain",
+    "heavy": "Heavy rain"
   },
   "app": {
     "name": "Buienradar",
