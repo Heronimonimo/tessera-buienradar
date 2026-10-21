@@ -25,7 +25,8 @@ A screen without pictures (the CYD, the Waveshare 3.5-inch, the Hosyond 4-inch) 
 
 - The graph and the radar frames are Buienradar's own, the ones its website and its embeddable widget show. They are
   free for private use with the source named; this README and the plugin's name do.
-- The newest radar frame is ten to fifteen minutes behind the clock, so it is always there to fetch. The forecast
+- The newest radar frame is the one Buienradar's forecast for your place ends its measured past with: usually six to
+  fifteen minutes old, sometimes over half an hour when Buienradar runs late. So it is always there to fetch. The forecast
   frames after it come from Buienradar's forecast made ten minutes before that one, which is always published by
   then, and reach about an hour and fifty minutes past the newest frame.
 - Without internet for a while, the tile keeps its last forecast and says it is older, and the map keeps playing

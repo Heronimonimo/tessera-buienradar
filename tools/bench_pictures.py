@@ -32,12 +32,14 @@ def frames(newest):
 
 def main():
     now = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
-    newest = (now - LAG) // STEP * STEP
+    # The plugin takes the newest frame from preview.yaml's answer (its past ends 20 minutes before the run), or from
+    # the clock (LAG): every newest frame of either within the next half hour.
+    newest = (now - 20 * 60) // STEP * STEP
     lines = [MARK, 'pictures:']
     lines.append('  "https://cdn.buienradar.nl/resources/image-api-backgrounds/map-nl-1058x916-webmercator_full.jpg": '
                  'preview/map.jpg')
     urls = []
-    for run in range(newest, newest + 7 * STEP, STEP):
+    for run in range(newest, (now - LAG) // STEP * STEP + 7 * STEP, STEP):
         urls += [u for u in frames(run) if u not in urls]
     lines += [f'  "{u}": preview/radar.png' for u in urls]
     path = ROOT / 'preview.yaml'

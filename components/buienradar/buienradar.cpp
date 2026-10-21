@@ -21,9 +21,10 @@ static constexpr uint32_t STEP = 300;
 // Below this many millimetres an hour it counts as dry, as Buienradar's own words do.
 static constexpr float RAIN = 0.1f;
 
-// The radar frames: from ten minutes before the newest to two hours after it, every five minutes. The newest frame is
-// about ten minutes behind the clock, so the frame of a moment is asked for only once it exists, and the first frame
-// lies about where the graph starts.
+// The radar frames: from ten minutes before the newest to two hours after it, every five minutes. How far the newest
+// frame lies behind the clock changes with Buienradar's processing (six minutes one hour, over half an hour the next),
+// so it comes from the graph's data: its measured past ends at the newest frame, and its forecast starts after a gap.
+// Only without that gap does the clock guess it, LAG behind now.
 // Buienradar's forecast runs appear later than its measured frames (six to over ten minutes after their moment, where
 // a measured frame takes about six), so the forecast frames come from the run made RUN_BEHIND frames before the newest:
 // an address that does not exist yet would paint the radar's place, over the whole map, in the card's colour. That
@@ -112,6 +113,7 @@ struct Forecast {
   uint32_t at[MAX_POINTS] = {};
   float mm[MAX_POINTS] = {};
   int n = 0;
+  uint32_t radar = 0;   // the newest measured radar frame: where the past ends, before the gap to the forecast; 0 unknown
   bool stale = false;
   char wait[16] = {};
 
@@ -135,6 +137,9 @@ struct Forecast {
       mm[n] = std::max(0.0f, item["mm"] | 0.0f);
       ++n;
     }
+    radar = 0;
+    for (int i = 0; i + 1 < n && !radar; ++i)
+      if (at[i + 1] > at[i] + STEP + STEP / 2) radar = at[i] / STEP * STEP;
   }
   // The point whose five minutes hold `t`: the last that starts at or before it.
   int index(uint32_t t) const {
@@ -578,7 +583,9 @@ class RainTile : public tessera::Tile {
     bool changed = false;
     // While Buienradar does not answer (the forecast is older), the map keeps the frames it has: the app still has
     // those, newer ones would not come and would leave the map blank.
-    const uint32_t newest = newest_ && forecast_.stale ? newest_ : newest_frame(epoch);
+    const uint32_t newest = newest_ && forecast_.stale ? newest_
+                          : forecast_.radar            ? forecast_.radar
+                                                       : newest_frame(epoch);
     if (newest != newest_) {
       newest_ = newest;
       changed = true;
@@ -825,7 +832,9 @@ class RadarCard : public tessera::Card {
     bool changed = false;
     // While Buienradar does not answer (the forecast is older), the map keeps the frames it has: the app still has
     // those, newer ones would not come and would leave the map blank.
-    const uint32_t newest = newest_ && forecast_.stale ? newest_ : newest_frame(epoch);
+    const uint32_t newest = newest_ && forecast_.stale ? newest_
+                          : forecast_.radar            ? forecast_.radar
+                                                       : newest_frame(epoch);
     if (newest != newest_) {
       newest_ = newest;
       changed = true;

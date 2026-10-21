@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.4 - 2026-10-21
+- The rain on the map no longer goes missing when Buienradar runs late: the map takes its newest radar frame from
+  Buienradar's forecast for your place (where its measured past ends) instead of guessing it from the clock. That
+  frame can be over half an hour old while Buienradar catches up; the badge on the map says how old.
+
 ## 0.3.3 - 2026-10-21
 - The graph is linear now: its top is 1, 2, 5, 10 mm/h or more, whatever the heaviest rain of the forecast fits
   under, so light rain still shows.
