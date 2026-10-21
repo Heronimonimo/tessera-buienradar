@@ -30,7 +30,7 @@
     "longitude": "Lengtegraad",
     "longitude_hint": "Van de plek, zoals 5.18.",
     "map": "Radarkaart",
-    "map_hint": "Op een tegel van 3x2, 2x3 of groter, en op de kaart. Een kleinere tegel toont alleen de grafiek.",
+    "map_hint": "Op een tegel van 3x2, 2x3 of groter, een grote 2x2, en op de kaart. Een kleinere tegel toont alleen de grafiek.",
     "play": "Kaart speelt",
     "play_hint": "Welke beelden de kaart op de tegel vanzelf afspeelt.",
     "play_all": "Laatste half uur en verwachting",

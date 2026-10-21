@@ -33,6 +33,9 @@ static const char *const BACKGROUND = "https://cdn.buienradar.nl/resources/image
 static constexpr int MAP_W = 1058, MAP_H = 916;
 // A tile or card at least this many percent as wide as high has the map beside the graph, else above it.
 static constexpr int WIDE = 125;
+// One at least this many percent as wide as high, and not wide, is square: the map large with the words or keys beside
+// it and a lower graph under both. Narrower is tall: the map on top, the rest under it.
+static constexpr int SQUARE = 80;
 static constexpr float WEST = 0.0f, EAST = 10.0f, NORTH = 54.8f, SOUTH = 49.5f;
 
 // Icons of Tessera's set.
@@ -383,7 +386,8 @@ class RainTile : public tessera::Tile {
     const std::string play = c.options["play"] | "all";
     play_ = play == "still" ? Play::STILL : play == "forecast" ? Play::FORECAST : Play::ALL;
     map_ = (c.options["map"] | true) && ui::pictures() &&
-           ((c.columns >= 3 && c.rows >= 2) || (c.columns >= 2 && c.rows >= 3));
+           ((c.columns >= 3 && c.rows >= 2) || (c.columns >= 2 && c.rows >= 3) ||
+            (c.columns >= 2 && c.rows >= 2 && std::min(c.width, c.height) >= ui::mm(35)));
     frame_ = first();
 
     const int w = c.width, h = c.height, gap = ui::px(6);
@@ -395,8 +399,15 @@ class RainTile : public tessera::Tile {
       const int x = mw + gap * 2, top = title + body + gap;
       words(c.parent, x, 0, w - x, title, body);
       graph_.make(c.parent, x, top, w - x, h - top, true);
+    } else if (map_ && w * 100 >= h * SQUARE) {
+      // Square: the map large at the top left, the words beside it, a lower graph across the bottom.
+      const int graph = std::max(h * 24 / 100, 3 * body + ui::px(4));
+      const int mw = Map::fit_width(w * 70 / 100, h - graph - gap), mh = Map::height_of(mw);
+      map_view_.make(c.parent, 0, 0, mw, latitude_, longitude_);
+      column(c.parent, mw + gap * 2, 0, w - mw - gap * 2, mh);
+      graph_.make(c.parent, 0, mh + gap, w, h - mh - gap, true);
     } else if (map_) {
-      // Square or tall: the map on top over the whole width, the words and the graph under it.
+      // Tall: the map on top over the whole width, the words and the graph under it.
       const int mw = Map::fit_width(w, h * 55 / 100), mh = Map::height_of(mw);
       map_view_.make(c.parent, (w - mw) / 2, 0, mw, latitude_, longitude_);
       words(c.parent, 0, mh + gap, w, title, body);
@@ -473,6 +484,17 @@ class RainTile : public tessera::Tile {
 
   int first() const { return play_ == Play::ALL ? FIRST_FRAME : 0; }
 
+  // The words in a narrow column beside the map: each over as many lines as it needs.
+  void column(lv_obj_t *parent, int x, int y, int w, int h) {
+    const int title = ui::line_height(Font::TITLE), body = ui::line_height(Font::BODY);
+    head_ = ui::text(parent, Font::TITLE, theme::INK);
+    lv_obj_set_size(head_, std::max(1, w), std::min(h, 2 * title));
+    lv_obj_set_pos(head_, x, y);
+    sub_ = ui::text(parent, Font::BODY, theme::MUTED);
+    lv_obj_set_size(sub_, std::max(1, w), std::max(body, std::min(h - 2 * title - ui::px(4), 4 * body)));
+    lv_obj_set_pos(sub_, x, y + 2 * title + ui::px(4));
+  }
+
   void words(lv_obj_t *parent, int x, int y, int w, int title, int body) {
     head_ = ui::label(parent, Font::TITLE, theme::INK);
     lv_obj_set_width(head_, std::max(1, w));
@@ -527,9 +549,15 @@ class RadarCard : public tessera::Card {
     pace_ = from.pace;
     const int w = c.width, h = c.height, gap = ui::px(10);
     const int body = ui::line_height(Font::BODY), value = ui::line_height(Font::VALUE);
-    // Wide: the map at the left over the whole height, the moment, the keys and the graph beside it. Square or tall:
+    // Wide: the map at the left over the whole height, the moment, the keys and the graph beside it. Square: the map
+    // large at the top left, the moment and the keys stacked beside it, the words and a lower graph under both. Tall:
     // the map on top over the whole width, the rest under it. The graph takes what the words leave.
     int x = 0, y = 0;
+    if (ui::pictures() && w * 100 < h * WIDE && w * 100 >= h * SQUARE) {
+      has_map_ = true;
+      open_square(c, w, h, gap, body, value);
+      return;
+    }
     if (ui::pictures()) {
       has_map_ = true;
       if (w * 100 >= h * WIDE) {
@@ -581,6 +609,55 @@ class RadarCard : public tessera::Card {
     graph_.make(c.parent, x, y, cw, std::max(3 * body, h - y), true);
   }
 
+  // The square card: the map, a column beside it with the moment and the three keys in a row under it, the words and
+  // the graph across the bottom.
+  void open_square(const tessera::CardContext &c, int w, int h, int gap, int body, int value) {
+    const Handoff &from = plugin_->handoff;
+    const int graph = std::max(h * 24 / 100, 3 * body + ui::px(8));
+    const int top = h - graph - 2 * body - 2 * gap;
+    const int column = std::max({ui::text_width("00:00", Font::VALUE) + ui::px(8), 3 * ui::mm(7) + 2 * ui::px(8),
+                                 w * 28 / 100});
+    const int mw = Map::fit_width(w - column - gap * 2, top), mh = Map::height_of(mw);
+    map_view_.make(c.parent, 0, 0, mw, from.latitude, from.longitude);
+    const int x = mw + gap * 2, cw = std::max(1, w - x);
+    time_ = ui::label(c.parent, Font::VALUE, theme::INK);
+    lv_obj_set_width(time_, cw);
+    lv_obj_set_pos(time_, x, 0);
+    when_ = ui::text(c.parent, Font::BODY, theme::MUTED);
+    lv_obj_set_size(when_, cw, 2 * body);
+    lv_obj_set_pos(when_, x, value);
+    // The keys in a row under the moment, as large as the column allows.
+    key_ = std::max(ui::px(24), std::min(std::max(ui::mm(9), ui::line_height(Font::ICON) + ui::px(8)),
+                                         (cw - 2 * ui::px(8)) / 3));
+    keys_x_ = x;
+    keys_y_ = value + 2 * body + gap;
+    for (int k = 0; k < 3; ++k) {
+      keys_[k] = ui::block(c.parent, theme::BUTTON);
+      lv_obj_set_size(keys_[k], key_, key_);
+      lv_obj_set_style_radius(keys_[k], LV_RADIUS_CIRCLE, 0);
+      lv_obj_set_pos(keys_[k], keys_x_ + k * (key_ + ui::px(8)), keys_y_);
+      icons_[k] = ui::label(keys_[k], Font::ICON, theme::INK);
+      lv_obj_set_width(icons_[k], key_);
+      lv_obj_set_style_text_align(icons_[k], LV_TEXT_ALIGN_CENTER, 0);
+      lv_obj_set_pos(icons_[k], 0, (key_ - ui::line_height(Font::ICON)) / 2);
+    }
+    ui::set_text(icons_[0], ui::icon(ICON_PREVIOUS));
+    ui::set_text(icons_[2], ui::icon(ICON_NEXT));
+    const int y = std::max(mh, keys_y_ + key_) + gap;
+    head_ = ui::text(c.parent, Font::BODY, theme::MUTED);
+    lv_obj_set_size(head_, w, 2 * body);
+    lv_obj_set_pos(head_, 0, y);
+    graph_.make(c.parent, 0, y + 2 * body + gap, w, std::max(3 * body, h - y - 2 * body - gap), true);
+  }
+
+  // Which of the three keys the finger is on: 0 back, 1 play or stop, 2 on; -1 for none.
+  int key_at(const tessera::Point &p) const {
+    const int along = p.x - keys_x_, across = p.y - keys_y_;
+    if (along < 0 || across < 0 || across >= key_) return -1;
+    const int k = along / (key_ + ui::px(8));
+    return k <= 2 && along - k * (key_ + ui::px(8)) < key_ ? k : -1;
+  }
+
   void on_state(JsonObjectConst data) override {
     forecast_.read(data);
     paint();
@@ -629,8 +706,7 @@ class RadarCard : public tessera::Card {
       const int64_t d = static_cast<int64_t>(graph_.time_at(p.x)) - static_cast<int64_t>(newest_);
       frame_ = static_cast<int>(std::max<int64_t>(FIRST_FRAME, std::min<int64_t>(LAST_FRAME, (d + (d >= 0 ? 150 : -150)) / 300)));
       playing_ = false;
-    } else if (p.y >= keys_y_ && p.y < keys_y_ + key_ && p.x >= keys_x_) {
-      const int k = (p.x - keys_x_) / (key_ + ui::px(8));
+    } else if (const int k = key_at(p); k >= 0) {
       if (k == 0) {
         frame_ = std::max(FIRST_FRAME, frame_ - 1);
         playing_ = false;

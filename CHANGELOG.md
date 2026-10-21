@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0 - 2026-10-21
+- A square tile or card shows a larger map with the words, or the time and the keys, beside it, and a lower graph
+  under both.
+- A 2x2 tile of at least 35 mm a side shows the map too.
+- The card's back, play and next keys stay in a row.
+
 ## 0.1.1 - 2026-10-21
 - The map is Buienradar's own radar background, the very area of the rain, so rain and map line up and the map
   has no edge where the radar stops.
