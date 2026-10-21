@@ -1,0 +1,53 @@
+# What tools/preview.py shows (the plugins repository's docs/PREVIEW.md). Buienradar's times are UTC, so the moments
+# below are too. The radar frames and map tiles have addresses that follow the clock, so the bench draws stand-ins.
+time_zone: UTC
+tiles:
+  - tile: rain
+    name: Rain radar
+    sizes: [3x2, 2x3, 4x4]
+  - tile: rain
+    name: Rain radar
+    sizes: [1x1, 2x1, 2x2]
+  - tile: rain
+    name: Not set
+    data: { wait: not_filled }
+    sizes: [2x1]
+
+answers:
+  rain:
+    forecasts:
+        - { utcdatetime: "{now-20m}", precipitation: 0 }
+        - { utcdatetime: "{now-15m}", precipitation: 0 }
+        - { utcdatetime: "{now-10m}", precipitation: 0 }
+        - { utcdatetime: "{now-5m}", precipitation: 0 }
+        - { utcdatetime: "{now+0m}", precipitation: 0 }
+        - { utcdatetime: "{now+5m}", precipitation: 0 }
+        - { utcdatetime: "{now+10m}", precipitation: 0 }
+        - { utcdatetime: "{now+15m}", precipitation: 0 }
+        - { utcdatetime: "{now+20m}", precipitation: 0 }
+        - { utcdatetime: "{now+25m}", precipitation: 0 }
+        - { utcdatetime: "{now+30m}", precipitation: 0.3 }
+        - { utcdatetime: "{now+35m}", precipitation: 0.5 }
+        - { utcdatetime: "{now+40m}", precipitation: 0.8 }
+        - { utcdatetime: "{now+45m}", precipitation: 1.3 }
+        - { utcdatetime: "{now+50m}", precipitation: 1.8 }
+        - { utcdatetime: "{now+55m}", precipitation: 2.4 }
+        - { utcdatetime: "{now+60m}", precipitation: 2.6 }
+        - { utcdatetime: "{now+65m}", precipitation: 2.4 }
+        - { utcdatetime: "{now+70m}", precipitation: 1.8 }
+        - { utcdatetime: "{now+75m}", precipitation: 1.1 }
+        - { utcdatetime: "{now+80m}", precipitation: 0.5 }
+        - { utcdatetime: "{now+85m}", precipitation: 0.2 }
+        - { utcdatetime: "{now+90m}", precipitation: 0.1 }
+        - { utcdatetime: "{now+95m}", precipitation: 0 }
+        - { utcdatetime: "{now+100m}", precipitation: 0 }
+        - { utcdatetime: "{now+105m}", precipitation: 0 }
+        - { utcdatetime: "{now+110m}", precipitation: 0 }
+        - { utcdatetime: "{now+115m}", precipitation: 0 }
+        - { utcdatetime: "{now+120m}", precipitation: 0 }
+        - { utcdatetime: "{now+125m}", precipitation: 0 }
+        - { utcdatetime: "{now+130m}", precipitation: 0 }
+        - { utcdatetime: "{now+135m}", precipitation: 0 }
+        - { utcdatetime: "{now+140m}", precipitation: 0 }
+        - { utcdatetime: "{now+145m}", precipitation: 0 }
+        - { utcdatetime: "{now+150m}", precipitation: 0 }

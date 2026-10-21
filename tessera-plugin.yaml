@@ -1,0 +1,60 @@
+# Buienradar: the rain of the next two hours for one place, as Buienradar's graph, and on larger tiles and the card
+# its radar map as well, playing from half an hour ago to two hours ahead. Every field is explained in the plugins
+# repository's docs/MANIFEST.md.
+id: buienradar
+version: 0.1.0
+api: "0.14"
+icon: weather-pouring
+maintainer: Heronimonimo
+license: MIT
+stage: beta
+topics: [weather]
+requires:
+  esphome: 2026.6.2
+boards: any
+flash_kb: 14
+
+permissions:
+  # The graph from Buienradar's forecast for one point, the radar frames from its picture host, the map under them from
+  # its tile host.
+  network: [graphdata.buienradar.nl, processing-cdn.buienradar.nl, tiles.buienradar.nl]
+attributes: [cloud]
+privacy: https://github.com/Heronimonimo/tessera-buienradar#privacy
+
+tiles:
+  # One tile of every size: the graph alone on a small tile, the map beside or above it from 3x2 or 2x3 on.
+  - id: rain
+    name: tile_name
+    icon: weather-pouring
+    sizes: { min: 1x1, max: 4x4 }
+    # The graph's bars, its lines and labels, the words, the map's five places, the marker and the badge.
+    memory: 5200
+    # Four map tiles and the radar frame over them.
+    pictures: 5
+    data: rain
+    example: tile_example
+    options:
+      - { id: latitude, kind: number, min: 49.5, max: 54.8, step: 0.01, default: 52.1, label: latitude, hint: latitude_hint }
+      - { id: longitude, kind: number, min: 0, max: 10, step: 0.01, default: 5.18, label: longitude, hint: longitude_hint }
+      - { id: map, kind: toggle, default: true, label: map, hint: map_hint }
+      - { id: play, kind: choice, default: all, label: play, hint: play_hint,
+          choices: [{ value: all, label: play_all }, { value: forecast, label: play_forecast },
+                    { value: still, label: play_still }] }
+      - { id: pace, kind: number, min: 1, max: 10, step: 1, unit: s, default: 2, label: pace, hint: pace_hint }
+
+cards:
+  # The map and the graph together over the whole glass; the graph is the timeline.
+  - { id: radar, name: card_name, wide: true, pictures: 5 }
+
+fetch:
+  # Buienradar's rain for one point, every five minutes from about twenty minutes ago to two and a half hours ahead,
+  # in millimetres an hour. The times are UTC.
+  - id: rain
+    url: https://graphdata.buienradar.nl/2.0/forecast/geo/RainHistoryForecast?lat={latitude}&lon={longitude}
+    every: 5m
+    map:
+      items: "$.forecasts[*]"
+      fields:
+        at: { path: utcdatetime, as: epoch, tz: UTC }
+        mm: { path: precipitation, as: number }
+      limit: 40

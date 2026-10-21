@@ -1,0 +1,42 @@
+{
+  "_meta": { "name": "Nederlands" },
+  "screen": {
+    "dry_until": "Droog tot {time}",
+    "dry_long": "Twee uur droog",
+    "rain_until": "Regen tot {time}",
+    "rain_long": "Twee uur regen",
+    "rain_in": "Regen over {n} min",
+    "most": "Tot {mm} mm/u",
+    "mm": "{mm} mm/u",
+    "dry": "Droog",
+    "now": "nu",
+    "later": "+{n} min",
+    "earlier": "-{n} min",
+    "asking": "Buienradar wordt gevraagd",
+    "failed": "Buienradar antwoordt niet",
+    "not_filled": "Kies de plek in de instellingen van de tegel",
+    "stale": "Oudere verwachting",
+    "source": "Buienradar",
+    "title": "Buienradar"
+  },
+  "app": {
+    "name": "Buienradar",
+    "summary": "De regen van de komende twee uur op jouw plek, als grafiek en radarkaart van Buienradar.",
+    "tile_name": "Buienradar",
+    "tile_example": "Droog tot 14:05",
+    "card_name": "Buienradar",
+    "latitude": "Breedtegraad",
+    "latitude_hint": "Van de plek, zoals 52.10. Home Assistant toont die onder Instellingen, Ruimtes, labels en zones.",
+    "longitude": "Lengtegraad",
+    "longitude_hint": "Van de plek, zoals 5.18.",
+    "map": "Radarkaart",
+    "map_hint": "Op een tegel van 3x2, 2x3 of groter, en op de kaart. Een kleinere tegel toont alleen de grafiek.",
+    "play": "Kaart speelt",
+    "play_hint": "Welke beelden de kaart op de tegel vanzelf afspeelt.",
+    "play_all": "Laatste half uur en verwachting",
+    "play_forecast": "Alleen de verwachting",
+    "play_still": "Staat stil op nu",
+    "pace": "Tijd per beeld",
+    "pace_hint": "Seconden dat elk beeld van de kaart op de tegel blijft."
+  }
+}

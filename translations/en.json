@@ -1,0 +1,42 @@
+{
+  "_meta": { "name": "English" },
+  "screen": {
+    "dry_until": "Dry until {time}",
+    "dry_long": "Dry for two hours",
+    "rain_until": "Rain until {time}",
+    "rain_long": "Rain for two hours",
+    "rain_in": "Rain in {n} min",
+    "most": "Up to {mm} mm/h",
+    "mm": "{mm} mm/h",
+    "dry": "Dry",
+    "now": "now",
+    "later": "+{n} min",
+    "earlier": "-{n} min",
+    "asking": "Asking Buienradar",
+    "failed": "Buienradar does not answer",
+    "not_filled": "Set the place in the tile's settings",
+    "stale": "Older forecast",
+    "source": "Buienradar",
+    "title": "Rain radar"
+  },
+  "app": {
+    "name": "Buienradar",
+    "summary": "Rain for the next two hours at your place, as Buienradar's graph and its radar map.",
+    "tile_name": "Rain radar",
+    "tile_example": "Dry until 14:05",
+    "card_name": "Rain radar",
+    "latitude": "Latitude",
+    "latitude_hint": "Of the place to show, such as 52.10. Home Assistant has it under Settings, Areas, labels and zones.",
+    "longitude": "Longitude",
+    "longitude_hint": "Of the place to show, such as 5.18.",
+    "map": "Radar map",
+    "map_hint": "On a tile of 3x2, 2x3 or larger, and on the card. A smaller tile shows the graph alone.",
+    "play": "Map plays",
+    "play_hint": "Which frames the tile's map plays by itself.",
+    "play_all": "Past half hour and forecast",
+    "play_forecast": "Forecast only",
+    "play_still": "Stands still on now",
+    "pace": "Time per frame",
+    "pace_hint": "Seconds each frame of the map stays on the tile."
+  }
+}
