@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1 - 2026-10-21
+- The map no longer goes blank for a while every five minutes: the forecast frames come from a Buienradar forecast
+  that is always published, not one that sometimes was not there yet.
+- A 1x1 tile shows the words alone, larger and in the middle; the graph did not fit beside them.
+
 ## 0.2.0 - 2026-10-21
 - A square tile or card shows a larger map with the words, or the time and the keys, beside it, and a lower graph
   under both.

@@ -23,7 +23,12 @@ static constexpr float RAIN = 0.1f;
 // The radar frames: from ten minutes before the newest to two hours after it, every five minutes. The newest frame is
 // about ten minutes behind the clock, so the frame of a moment is asked for only once it exists, and the first frame
 // lies about where the graph starts.
-static constexpr int FIRST_FRAME = -2, LAST_FRAME = 24;
+// Buienradar's forecast runs appear later than its measured frames (six to over ten minutes after their moment, where
+// a measured frame takes about six), so the forecast frames come from the run made RUN_BEHIND frames before the newest:
+// an address that does not exist yet would paint the radar's place, over the whole map, in the card's colour. That
+// run reaches two hours past its own moment, so the frames go RUN_BEHIND fewer steps ahead.
+static constexpr int RUN_BEHIND = 2;
+static constexpr int FIRST_FRAME = -2, LAST_FRAME = 24 - RUN_BEHIND;
 static constexpr uint32_t LAG = 600;
 
 // The map: Buienradar's own background for its radar, the very area of the radar frames (longitude 0 to 10, latitude
@@ -82,8 +87,8 @@ static uint32_t frame_time(uint32_t newest, int frame) {
 static std::string frame_url(uint32_t newest, int frame) {
   const uint32_t t = frame_time(newest, frame);
   if (frame <= 0) return "https://processing-cdn.buienradar.nl/processing/nl/rain/current/webm/" + stamp(t) + ".png";
-  return "https://processing-cdn.buienradar.nl/processing/nl/rain/forecast/runs/webm/" + stamp(newest) + "/" +
-         stamp(t) + ".png";
+  return "https://processing-cdn.buienradar.nl/processing/nl/rain/forecast/runs/webm/" +
+         stamp(frame_time(newest, -RUN_BEHIND)) + "/" + stamp(t) + ".png";
 }
 
 static std::string millimetres(float mm) {
@@ -207,6 +212,7 @@ class Graph {
 
   // The forecast against the clock; `cursor` the map's moment, 0 for none.
   void paint(const tessera::Plugin *p, const Forecast &f, uint32_t now, uint32_t cursor) {
+    if (!base_) return;   // a tile without a graph (one cell)
     if (!f.n) {
       for (auto *bar : bars_) shown(bar, false);
       shown(now_, false);
@@ -259,6 +265,7 @@ class Graph {
   }
 
   void colors() {
+    if (!base_) return;
     ui::set_fill(base_, Tone::NORMAL, theme::LINE);
     ui::set_fill(now_, Tone::NORMAL, theme::MUTED);
     ui::set_fill(cursor_, Tone::NORMAL, theme::INK);
@@ -372,7 +379,7 @@ class Map {
 // ---- The tile ----
 
 // The graph on every size; on a tile of 3x2, 2x3 or larger (and a board with pictures) the map too, playing by itself.
-// One cell says it in words over a small graph. A tap opens the card at the frame the map shows.
+// One cell says it in words alone. A tap opens the card at the frame the map shows.
 class RainTile : public tessera::Tile {
  public:
   explicit RainTile(Buienradar *plugin) : plugin_(plugin) {}
@@ -414,15 +421,16 @@ class RainTile : public tessera::Tile {
       const int top = mh + gap + title + body + gap;
       graph_.make(c.parent, 0, top, w, h - top, true);
     } else if (c.columns == 1 && c.rows == 1) {
-      // One cell: the words over two lines, a small graph under them.
-      head_ = ui::text(c.parent, Font::BODY_LARGE, theme::INK);
-      lv_obj_set_size(head_, w, 2 * ui::line_height(Font::BODY_LARGE));
-      lv_obj_set_pos(head_, 0, 0);
-      sub_ = ui::label(c.parent, Font::BODY, theme::MUTED);
-      lv_obj_set_width(sub_, w);
-      lv_obj_set_pos(sub_, 0, 2 * ui::line_height(Font::BODY_LARGE));
-      const int spark = std::max(ui::px(10), h / 4);
-      graph_.make(c.parent, 0, h - spark, w, spark, false);
+      // One cell: the words alone, over two lines and the second line under them, in the middle. A graph does not fit.
+      const Font big = h >= 2 * ui::line_height(Font::TITLE) + 2 * ui::line_height(Font::BODY) ? Font::TITLE : Font::BODY_LARGE;
+      const int lines = 2 * ui::line_height(big), sub = 2 * ui::line_height(Font::BODY);
+      const int top = std::max(0, (h - lines - sub) / 2);
+      head_ = ui::text(c.parent, big, theme::INK);
+      lv_obj_set_size(head_, w, lines);
+      lv_obj_set_pos(head_, 0, top);
+      sub_ = ui::text(c.parent, Font::BODY, theme::MUTED);
+      lv_obj_set_size(sub_, w, std::min(sub, h - top - lines));
+      lv_obj_set_pos(sub_, 0, top + lines);
       one_cell_ = true;
     } else {
       // The graph alone: the words on top, the graph under them with the hours.

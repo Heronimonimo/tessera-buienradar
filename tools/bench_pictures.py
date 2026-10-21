@@ -14,7 +14,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MARK = '# pictures: written by tools/bench_pictures.py'
-STEP, LAG, FIRST, LAST = 300, 600, -2, 24     # as buienradar.cpp
+STEP, LAG, RUN_BEHIND = 300, 600, 2          # as buienradar.cpp
+FIRST, LAST = -2, 24 - RUN_BEHIND
 CDN = 'https://processing-cdn.buienradar.nl/processing/nl/rain/'
 
 
@@ -26,7 +27,7 @@ def frames(newest):
     for k in range(FIRST, LAST + 1):
         t = newest + k * STEP
         yield (CDN + 'current/webm/' + stamp(t) + '.png') if k <= 0 else \
-              (CDN + 'forecast/runs/webm/' + stamp(newest) + '/' + stamp(t) + '.png')
+              (CDN + 'forecast/runs/webm/' + stamp(newest - RUN_BEHIND * STEP) + '/' + stamp(t) + '.png')
 
 
 def main():
