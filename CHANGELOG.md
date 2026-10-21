@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1 - 2026-10-21
+- "Buienradar does not answer" is gone for a place on a whole degree (52.0, 5.0): Buienradar only answers a
+  coordinate written in its shortest form, and the list now sends it so. Choose the place again if the tile says it.
+- Latitude starts at 49.6: Buienradar has no forecast at 49.5.
+
 ## 0.3.0 - 2026-10-21
 - Latitude and longitude are now chosen from a list in steps of 0.1, always shown with one decimal. Choose your
   place again after this update: the tile starts at De Bilt (52.1, 5.2).
