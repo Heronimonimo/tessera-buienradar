@@ -238,7 +238,7 @@ class Graph {
     x_ = x;
     y_ = y;
     w_ = std::max(1, w);
-    axis_ = axis && h > 3 * body;
+    axis_ = axis && h >= 2 * body + ui::px(4);   // the hours under the bars whenever a line of bars still fits above them
     gh_ = std::max(1, h - (axis_ ? body : 0));
     if (scale && gh_ > 3 * body) {
       // The unit over the scale, the numbers right-aligned in a margin at the left, the lines across the bars' room.

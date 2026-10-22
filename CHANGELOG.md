@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.5 - 2026-10-22
+- Every tile's graph shows its times (now and the hours) under the bars, also on a low tile.
+
 ## 0.3.4 - 2026-10-21
 - The rain on the map no longer goes missing when Buienradar runs late: the map takes its newest radar frame from
   Buienradar's forecast for your place (where its measured past ends) instead of guessing it from the clock. That
