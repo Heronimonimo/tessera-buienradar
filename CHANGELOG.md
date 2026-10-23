@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.6 - 2026-10-23
+- The time axis shows whole hours (21:00, 22:00) at their place on the graph; the line at now stays.
+
 ## 0.3.5 - 2026-10-22
 - Every tile's graph shows its times (now and the hours) under the bars, also on a low tile.
 

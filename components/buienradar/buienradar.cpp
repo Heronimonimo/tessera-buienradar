@@ -368,19 +368,23 @@ class Graph {
     shown(cursor_, cursor_in);
     if (cursor_in) lv_obj_set_pos(cursor_, std::min(x_ + w_ - 2, std::max(x_, cursor < t0_ ? x_ : x_of(cursor))), y_);
     if (!axis_) return;
+    // The whole hours of the screen's own clock the graph spans (21:00, 22:00), each centred under its moment; one
+    // that would stick out of the graph is left out rather than shifted off its hour.
+    const tessera::LocalTime start = tessera::local_time(t0_);
+    const uint32_t into = static_cast<uint32_t>(start.minute) * 60 + static_cast<uint32_t>(start.second);
+    const uint32_t first = into ? t0_ + 3600 - into : t0_;
     for (int k = 0; k < 3; ++k) {
       lv_obj_t *l = labels_[k];
-      const uint32_t t = now + static_cast<uint32_t>(k) * 3600;
-      if (!now || t >= t1_) {
+      const uint32_t t = first + static_cast<uint32_t>(k) * 3600;
+      const std::string words = tessera::clock_text(t);
+      const int lw = std::min(w_, ui::text_width(words, Font::BODY) + 2), at = x_of(t) - lw / 2;
+      if (t >= t1_ || at < x_ || at + lw > x_ + w_) {
         ui::set_text(l, "");
         continue;
       }
-      // As wide as its words, under its moment, kept inside the graph.
-      const std::string words = k == 0 ? std::string(p->text("now")) : tessera::clock_text(t);
-      const int lw = std::min(w_, ui::text_width(words, Font::BODY) + 2);
       lv_obj_set_width(l, lw);
       ui::set_text(l, words);
-      lv_obj_set_pos(l, std::min(x_ + w_ - lw, std::max(x_, x_of(t) - lw / 2)), y_ + gh_);
+      lv_obj_set_pos(l, at, y_ + gh_);
     }
   }
 
