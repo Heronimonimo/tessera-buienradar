@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 - 2026-10-23
+- Latitude and longitude are typed again, now to two decimals (about 1 km), such as 52.09 and 5.12. Buienradar takes
+  a coordinate only in its shortest form, so the tile checks what you typed and says exactly what to type instead
+  (for 52,09 or 52.10). The place you chose from the list stays, as its text; a place kept as a number by a version
+  before 0.3.0 starts at De Bilt (52.1, 5.18) again.
+
 ## 0.3.6 - 2026-10-23
 - The time axis shows whole hours (21:00, 22:00) at their place on the graph; the line at now stays.
 

@@ -9,6 +9,7 @@ struct Handoff {
   float latitude = 52.1f, longitude = 5.2f;
   int frame = 0;      // the map's frame, 0 for now
   int pace = 2;       // seconds per frame
+  char problem[96] = {};   // what to type for the place, when Buienradar would not take it as typed
 };
 
 // The plugin: an ESPHome component and a tessera::Plugin. It registers its tile and its card in setup().

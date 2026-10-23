@@ -93,13 +93,36 @@ static std::string frame_url(uint32_t newest, int frame) {
          stamp(frame_time(newest, -RUN_BEHIND)) + "/" + stamp(t) + ".png";
 }
 
-// A coordinate option: a pick of the list ("52.1"), or a number as an older version kept it.
-static float coordinate(JsonVariantConst value, float fallback) {
+// A coordinate as Buienradar writes it in its URLs: a point, at most two decimals, no zero at the end ("52.09",
+// "52.1", "52"). It answers any other form (52,09, 52.10, 52.091) with a redirect to this one, which the app does
+// not follow, so the forecast would never come.
+static std::string buienradar_form(float value) {
+  char out[16];
+  snprintf(out, sizeof(out), "%.2f", std::round(value * 100.0f) / 100.0f);
+  std::string text = out;
+  while (!text.empty() && text.back() == '0') text.pop_back();
+  if (!text.empty() && text.back() == '.') text.pop_back();
+  return text == "-0" ? "0" : text;
+}
+
+// A coordinate option as typed (text since 0.4.0; a list's pick or a number before), read leniently: a comma for the
+// point, spaces around it. `typed` gets the words the app sends as they are.
+static float coordinate(JsonVariantConst value, float fallback, std::string &typed) {
   if (value.is<const char *>()) {
-    const char *text = value.as<const char *>();
-    return text && *text ? static_cast<float>(atof(text)) : fallback;
+    typed = value.as<const char *>() ? value.as<const char *>() : "";
+  } else if (value.is<float>()) {
+    typed = buienradar_form(value.as<float>());
+  } else {
+    typed = "";
   }
-  return value.is<float>() ? value.as<float>() : fallback;
+  std::string clean;
+  for (char ch : typed) {
+    if (ch == ' ') continue;
+    clean += ch == ',' ? '.' : ch;
+  }
+  char *end = nullptr;
+  const float v = clean.empty() ? NAN : strtof(clean.c_str(), &end);
+  return std::isnan(v) || (end && *end) ? fallback : v;
 }
 
 static std::string millimetres(float mm) {
@@ -517,8 +540,20 @@ class RainTile : public tessera::Tile {
 
   void create(const tessera::TileContext &c) override {
     tile_ = c.tile;
-    latitude_ = coordinate(c.options["latitude"], 52.1f);
-    longitude_ = coordinate(c.options["longitude"], 5.2f);
+    // The place, and whether Buienradar takes it as typed: if not, the tile says what to type instead (the app sends
+    // the words as they are, the plugin cannot change them).
+    std::string lat_typed, lon_typed;
+    latitude_ = coordinate(c.options["latitude"], 52.1f, lat_typed);
+    longitude_ = coordinate(c.options["longitude"], 5.18f, lon_typed);
+    problem_[0] = 0;
+    if (lat_typed != buienradar_form(latitude_))
+      snprintf(problem_, sizeof(problem_), "%s",
+               tessera::fill(plugin_->text("fix_latitude"), "value", buienradar_form(latitude_)).c_str());
+    else if (lon_typed != buienradar_form(longitude_))
+      snprintf(problem_, sizeof(problem_), "%s",
+               tessera::fill(plugin_->text("fix_longitude"), "value", buienradar_form(longitude_)).c_str());
+    else if (latitude_ < SOUTH || latitude_ > NORTH || longitude_ < WEST || longitude_ > EAST)
+      snprintf(problem_, sizeof(problem_), "%s", plugin_->text("outside"));
     pace_ = std::max(1, std::min(10, c.options["pace"] | 2));
     const std::string play = c.options["play"] | "all";
     play_ = play == "still" ? Play::STILL : play == "forecast" ? Play::FORECAST : Play::ALL;
@@ -624,6 +659,7 @@ class RainTile : public tessera::Tile {
     plugin_->handoff.longitude = longitude_;
     plugin_->handoff.frame = map_ ? frame_ : 0;
     plugin_->handoff.pace = pace_;
+    snprintf(plugin_->handoff.problem, sizeof(plugin_->handoff.problem), "%s", problem_);
     // No title of its own: Tessera titles the card with the tile's name, as it does its own cards.
     tessera::open_card(plugin_->plugin_id(), "radar", "", tile_);
   }
@@ -671,7 +707,12 @@ class RainTile : public tessera::Tile {
   }
 
   void paint() {
-    const Summary s = summarise(plugin_, forecast_, now_);
+    Summary s = summarise(plugin_, forecast_, now_);
+    if (problem_[0]) {
+      s.head = problem_;
+      s.sub.clear();
+      s.rain_later = false;
+    }
     if (head_) ui::set_text(head_, s.head);
     if (sub_) {
       // How hard it rains at most (or that the forecast is older); a single cell says when the rain starts instead.
@@ -688,6 +729,7 @@ class RainTile : public tessera::Tile {
   Buienradar *plugin_;
   int tile_ = -1;
   float latitude_ = 52.1f, longitude_ = 5.2f;
+  char problem_[96] = {};   // what to type instead, when Buienradar would not take the place as typed
   int pace_ = 2;
   Play play_ = Play::ALL;
   bool map_ = false, one_cell_ = false, fit_words_ = false;   // fit_words_: the words sized to their length
@@ -901,7 +943,8 @@ class RadarCard : public tessera::Card {
  private:
   void paint() {
     const Summary s = summarise(plugin_, forecast_, now_);
-    ui::set_text(head_, s.sub.empty() ? s.head : s.head + ". " + s.sub);
+    const char *problem = plugin_->handoff.problem;
+    ui::set_text(head_, problem[0] ? std::string(problem) : s.sub.empty() ? s.head : s.head + ". " + s.sub);
     uint32_t cursor = 0;
     if (has_map_ && newest_) {
       cursor = frame_time(newest_, frame_);
