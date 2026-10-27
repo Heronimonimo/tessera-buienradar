@@ -25,7 +25,16 @@
     "heavy": "Heavy rain",
     "fix_latitude": "Type the latitude as {value}",
     "fix_longitude": "Type the longitude as {value}",
-    "outside": "The place lies outside Buienradar's map"
+    "outside": "The place lies outside Buienradar's map",
+    "dry_in": "Dry in {n} min",
+    "bar_when": "Rain in top bar",
+    "bar_always": "Always",
+    "bar_coming": "Rain coming",
+    "bar_near": "Rain near",
+    "bar_words": "Top bar says",
+    "bar_clock": "Clock time",
+    "bar_minutes": "Minutes",
+    "name": "Buienradar"
   },
   "app": {
     "name": "Buienradar",
@@ -45,6 +54,12 @@
     "play_forecast": "Forecast only",
     "play_still": "Stands still on now",
     "pace": "Time per frame",
-    "pace_hint": "Seconds each frame of the map stays on the tile."
+    "pace_hint": "Seconds each frame of the map stays on the tile.",
+    "bar_rain": "Rain",
+    "bar_example": "Dry until 14:05",
+    "setting_bar_when": "Rain in top bar",
+    "setting_bar_when_hint": "When the top bar item shows: always, when rain is coming in the next two hours, or when it starts within half an hour. It says what the screen's Rain radar tile knows, so the screen needs that tile too.",
+    "setting_bar_words": "Top bar says",
+    "setting_bar_words_hint": "The moment as a clock time (Dry until 14:05) or in minutes (Rain in 20 min)."
   }
 }

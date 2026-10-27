@@ -1,3 +1,28 @@
 # What a screen gets when it takes this plugin: the component, configured. Tessera includes this file from the screen's
 # <name>.plugins.yaml and adds this plugin's components/ folder as an ESPHome external component.
+
+# Two settings of the top bar's item, kept on the screen and shown in Home Assistant, in the plugin's details on the
+# screen's Plugins tab and on the screen's settings page: when the item shows, and how it says the moment.
+select:
+  - platform: template
+    id: buienradar_bar_when
+    name: "Rain in top bar"
+    icon: mdi:weather-pouring
+    options: ["Always", "When rain is coming", "When rain is near"]
+    initial_option: "When rain is coming"
+    optimistic: true
+    restore_value: true
+    entity_category: config
+  - platform: template
+    id: buienradar_bar_words
+    name: "Rain top bar words"
+    icon: mdi:clock-outline
+    options: ["Clock time", "Minutes"]
+    initial_option: "Clock time"
+    optimistic: true
+    restore_value: true
+    entity_category: config
+
 buienradar:
+  bar_when: buienradar_bar_when
+  bar_words: buienradar_bar_words

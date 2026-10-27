@@ -25,7 +25,16 @@
     "heavy": "Zware regen",
     "fix_latitude": "Typ de breedtegraad als {value}",
     "fix_longitude": "Typ de lengtegraad als {value}",
-    "outside": "De plek ligt buiten de kaart van Buienradar"
+    "outside": "De plek ligt buiten de kaart van Buienradar",
+    "dry_in": "Droog over {n} min",
+    "bar_when": "Regen in bovenbalk",
+    "bar_always": "Altijd",
+    "bar_coming": "Regen komt",
+    "bar_near": "Regen dichtbij",
+    "bar_words": "Bovenbalk zegt",
+    "bar_clock": "Kloktijd",
+    "bar_minutes": "Minuten",
+    "name": "Buienradar"
   },
   "app": {
     "name": "Buienradar",
@@ -45,6 +54,12 @@
     "play_forecast": "Alleen de verwachting",
     "play_still": "Staat stil op nu",
     "pace": "Tijd per beeld",
-    "pace_hint": "Seconden dat elk beeld van de kaart op de tegel blijft."
+    "pace_hint": "Seconden dat elk beeld van de kaart op de tegel blijft.",
+    "bar_rain": "Regen",
+    "bar_example": "Droog tot 14:05",
+    "setting_bar_when": "Regen in bovenbalk",
+    "setting_bar_when_hint": "Wanneer het item in de bovenbalk staat: altijd, als er in de komende twee uur regen komt, of als die binnen een half uur begint. Het zegt wat de Buienradar-tegel van het scherm weet, dus het scherm heeft die tegel ook nodig.",
+    "setting_bar_words": "Bovenbalk zegt",
+    "setting_bar_words_hint": "Het moment als kloktijd (Droog tot 14:05) of in minuten (Regen over 20 min)."
   }
 }

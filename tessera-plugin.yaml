@@ -2,7 +2,7 @@
 # its radar map as well, playing from half an hour ago to two hours ahead. Every field is explained in the plugins
 # repository's docs/MANIFEST.md.
 id: buienradar
-version: 0.4.0
+version: 0.5.0
 api: "0.14"
 icon: weather-pouring
 maintainer: Heronimonimo
@@ -44,6 +44,15 @@ tiles:
           choices: [{ value: all, label: play_all }, { value: forecast, label: play_forecast },
                     { value: still, label: play_still }] }
       - { id: pace, kind: number, min: 1, max: 10, step: 1, unit: s, default: 2, label: pace, hint: pace_hint }
+
+bar_items:
+  # "Dry until 14:05" in the top bar, from what the screen's tile knows.
+  - { id: rain, label: bar_rain, icon: weather-pouring, example: bar_example }
+
+# The top bar item's two settings, the selects of plugin.yaml (their names as ids).
+settings:
+  - { key: rain_in_top_bar, label: setting_bar_when, hint: setting_bar_when_hint }
+  - { key: rain_top_bar_words, label: setting_bar_words, hint: setting_bar_words_hint }
 
 cards:
   # The map and the graph together over the whole glass; the graph is the timeline.

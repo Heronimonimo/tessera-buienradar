@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <vector>
 #include "esphome/core/hal.h"
 
 namespace esphome::buienradar {
@@ -46,6 +47,7 @@ static constexpr int SQUARE = 80;
 static constexpr float WEST = 0.0f, EAST = 10.0f, NORTH = 54.8f, SOUTH = 49.5f;
 
 // Icons of Tessera's set.
+static constexpr uint32_t ICON_POURING = 0xF0596, ICON_RAINY = 0xF0597, ICON_DRY = 0xF0595;
 static constexpr uint32_t ICON_PLAY = 0xF040A, ICON_PAUSE = 0xF03E4, ICON_PREVIOUS = 0xF0141, ICON_NEXT = 0xF0142;
 
 static void shown(lv_obj_t *obj, bool on) {
@@ -614,6 +616,16 @@ class RainTile : public tessera::Tile {
 
   void on_state(JsonObjectConst data) override {
     forecast_.read(data, now_ ? now_ : tessera::epoch());
+    // The top bar's item says what this tile knows: the forecast, when it answered for a place Buienradar takes.
+    if (forecast_.n && !forecast_.stale && !problem_[0]) {
+      Latest &latest = plugin_->latest;
+      latest.n = std::min(forecast_.n, Latest::POINTS);
+      for (int i = 0; i < latest.n; ++i) {
+        latest.at[i] = forecast_.at[i];
+        latest.mm[i] = forecast_.mm[i];
+      }
+      latest.received = tessera::epoch();
+    }
     paint();
   }
 
@@ -978,6 +990,61 @@ class RadarCard : public tessera::Card {
 void Buienradar::setup() {
   add_tile("rain", [this]() { return new RainTile(this); });
   add_card("radar", [this]() { return new RadarCard(this); }, true);
+  add_bar_item("rain", [this]() { return bar(); });
+}
+
+// ---- The top bar's item ----
+
+// "Droog tot 14:05" or "Regen over 20 min" in the top bar, from the forecast the screen's tile got last: blue while it
+// rains, amber when rain starts within half an hour. Its settings say when it shows (always, when rain is coming, when
+// rain is near) and whether it says a clock time or minutes. Nothing when no tile had an answer in the last half hour.
+static constexpr uint32_t BAR_FRESH = 1800, NEAR = 1800;
+
+tessera::BarItem Buienradar::bar() const {
+  tessera::BarItem item;
+  const uint32_t now = tessera::epoch();
+  const Latest &f = latest;
+  if (!now || !f.n || now - f.received > BAR_FRESH || f.at[f.n - 1] + STEP <= now) return item;
+  int i = 0;
+  for (int j = 0; j < f.n; ++j)
+    if (f.at[j] <= now) i = j;
+  const bool raining = f.mm[i] >= RAIN;
+  int change = -1;   // the first moment it stops (while raining) or starts (while dry)
+  for (int j = i + 1; j < f.n && change < 0; ++j)
+    if ((f.mm[j] >= RAIN) != raining) change = j;
+  const long minutes = change >= 0 && f.at[change] > now ? static_cast<long>((f.at[change] - now + 59) / 60) : 0;
+  const auto chosen = [](select::Select *s, size_t fallback) {
+    const auto index = s ? s->active_index() : optional<size_t>{};
+    return index.has_value() ? *index : fallback;
+  };
+  const size_t when = chosen(bar_when_, 1);
+  const bool in_minutes = chosen(bar_words_, 0) == 1;
+  const bool rain_near = !raining && change >= 0 && minutes * 60 <= static_cast<long>(NEAR);
+  if (when == 1 && !raining && change < 0) return item;    // when rain is coming: dry the whole forecast
+  if (when == 2 && !raining && !rain_near) return item;    // when rain is near: no rain within half an hour
+  item.shown = true;
+  item.icon = raining ? ICON_POURING : change >= 0 ? ICON_RAINY : ICON_DRY;
+  item.tone = raining ? Tone::ACCENT : rain_near ? Tone::BUSY : Tone::NORMAL;
+  if (change < 0)
+    item.text = text(raining ? "rain_long" : "dry_long");
+  else if (in_minutes)
+    item.text = tessera::format(text(raining ? "dry_in" : "rain_in"), minutes);
+  else
+    item.text = tessera::fill(text(raining ? "rain_until" : "dry_until"), "time", tessera::clock_text(f.at[change]));
+  return item;
+}
+
+bool Buienradar::settings(tessera::SettingsPage &page) {
+  page.icon = "\U000F0596";
+  const auto row = [&page](const char *label, select::Select *s, std::vector<std::string> words, size_t fallback) {
+    if (!s) return;
+    page.choice(label, std::move(words),
+                [s, fallback] { const auto index = s->active_index(); return static_cast<int>(index.has_value() ? *index : fallback); },
+                [s](int index) { s->make_call().set_index(static_cast<size_t>(index)).perform(); });
+  };
+  row(text("bar_when"), bar_when_, {text("bar_always"), text("bar_coming"), text("bar_near")}, 1);
+  row(text("bar_words"), bar_words_, {text("bar_clock"), text("bar_minutes")}, 0);
+  return bar_when_ || bar_words_;
 }
 
 }  // namespace esphome::buienradar

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 - 2026-10-27
+- An item for the top bar: "Dry until 14:05" or "Rain until 15:10", blue while it rains, amber when rain starts
+  within half an hour. It says what the screen's Rain radar tile knows, so place that tile on the screen too.
+- Two settings for it, on the screen's settings page and in Home Assistant: when it shows (always, when rain is
+  coming, when rain is near) and whether it says a clock time or minutes ("Rain in 20 min").
+
 ## 0.4.0 - 2026-10-23
 - Latitude and longitude are typed again, now to two decimals (about 1 km), such as 52.09 and 5.12. Buienradar takes
   a coordinate only in its shortest form, so the tile checks what you typed and says exactly what to type instead
