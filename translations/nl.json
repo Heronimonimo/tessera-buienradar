@@ -48,6 +48,8 @@
     "longitude_hint": "Met een punt en hoogstens twee decimalen, zoals 5.12.",
     "map": "Radarkaart",
     "map_hint": "Op een tegel van 3x2, 2x3 of groter, een grote 2x2, en op de kaart. Een kleinere tegel toont alleen de grafiek.",
+    "graph": "Grafiek op de tegel",
+    "graph_hint": "Uit: een tegel van 2x2 of groter toont alleen de bewegende radarkaart, zo groot als past. De grafiek blijft op de kaart die een tik opent, en op een scherm zonder afbeeldingen.",
     "play": "Kaart speelt",
     "play_hint": "Welke beelden de kaart op de tegel vanzelf afspeelt.",
     "play_all": "Laatste half uur en verwachting",

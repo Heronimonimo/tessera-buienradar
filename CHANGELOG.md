@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+- **Graph on the tile**, a new option: turn it off and a tile of 2x2 or larger shows the moving radar map alone, as
+  large as it fits, with the frame's time in its corner. Good for a small screen such as the 4-inch, where the graph
+  takes much of a 2x2. A tap still opens the card with the map and the graph. On a screen without pictures the graph
+  stays.
+
 ## 0.5.0 - 2026-10-27
 - An item for the top bar: "Dry until 14:05" or "Rain until 15:10", blue while it rains, amber when rain starts
   within half an hour. It says what the screen's Rain radar tile knows, so place that tile on the screen too.

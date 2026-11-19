@@ -12,6 +12,10 @@ tiles:
     name: Square
     sizes: [3x3]
   - tile: rain
+    name: Radar alone
+    options: { graph: false }
+    sizes: [2x2]
+  - tile: rain
     name: Typo
     options: { latitude: "52,09", longitude: "5.12" }
     sizes: [2x1]

@@ -559,14 +559,20 @@ class RainTile : public tessera::Tile {
     pace_ = std::max(1, std::min(10, c.options["pace"] | 2));
     const std::string play = c.options["play"] | "all";
     play_ = play == "still" ? Play::STILL : play == "forecast" ? Play::FORECAST : Play::ALL;
+    // Without the graph, the map alone takes any tile of 2x2 or more (on a screen with pictures; else the graph stays).
+    const bool graph = c.options["graph"] | true;
     map_ = (c.options["map"] | true) && ui::pictures() &&
            ((c.columns >= 3 && c.rows >= 2) || (c.columns >= 2 && c.rows >= 3) ||
-            (c.columns >= 2 && c.rows >= 2 && std::min(c.width, c.height) >= ui::mm(35)));
+            (c.columns >= 2 && c.rows >= 2 && (!graph || std::min(c.width, c.height) >= ui::mm(35))));
     frame_ = first();
 
     const int w = c.width, h = c.height, gap = ui::px(6);
     const int title = ui::line_height(Font::TITLE), body = ui::line_height(Font::BODY);
-    if (map_ && w * 100 >= h * WIDE) {
+    if (map_ && !graph) {
+      // The map alone, as large as the tile takes it, in the middle; its corner says the frame's time.
+      const int mw = Map::fit_width(w, h);
+      map_view_.make(c.parent, (w - mw) / 2, (h - Map::height_of(mw)) / 2, mw, latitude_, longitude_);
+    } else if (map_ && w * 100 >= h * WIDE) {
       // Wide: the map at the left over the whole height, the words and the graph beside it.
       const int mw = Map::fit_width(w * 60 / 100, h);
       map_view_.make(c.parent, 0, (h - Map::height_of(mw)) / 2, mw, latitude_, longitude_);

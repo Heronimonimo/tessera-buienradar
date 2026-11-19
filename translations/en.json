@@ -48,6 +48,8 @@
     "longitude_hint": "With a point and at most two decimals, such as 5.12.",
     "map": "Radar map",
     "map_hint": "On a tile of 3x2, 2x3 or larger, a large 2x2, and on the card. A smaller tile shows the graph alone.",
+    "graph": "Graph on the tile",
+    "graph_hint": "Off: a tile of 2x2 or larger shows the moving radar map alone, as large as it fits. The graph stays on the card a tap opens, and on a screen without pictures.",
     "play": "Map plays",
     "play_hint": "Which frames the tile's map plays by itself.",
     "play_all": "Past half hour and forecast",
