@@ -12,7 +12,7 @@ topics: [weather]
 requires:
   esphome: 2026.6.2
 boards: any
-flash_kb: 14
+flash_kb: 30
 
 permissions:
   # The graph from Buienradar's forecast for one point, the radar frames from its picture host, the map under them (its
