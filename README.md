@@ -16,10 +16,10 @@ A screen without pictures (the CYD, the Waveshare 3.5-inch, the Hosyond 4-inch) 
 
 1. Add the plugin to a screen in Tessera. The screen builds once.
 2. In Layout, place the **Rain radar** tile from the library's Plugins group. Make it 3x2 or larger for the map.
-3. In the inspector, type the **Latitude** and **Longitude** of the place with a point and at most two decimals
-   (about 1 km), such as `52.09` and `5.12`, in the Netherlands or Belgium. Home Assistant shows the coordinates of
-   your home under Settings, Areas, labels and zones. If Buienradar would not take what you typed (`52,09`, `52.10`),
-   the tile says what to type instead. The graph and the dot on the map both use these.
+3. In the inspector, **Place** is your home zone already. Choose another zone, or a person to have the rain follow
+   them (a person's place moves the tile's place at most once a kilometre). For a place Home Assistant does not know,
+   type its **Latitude** and **Longitude** instead, such as `52.09` and `5.12`; typed coordinates win when both are
+   filled in. The place must lie in the Netherlands or Belgium. The graph and the dot on the map both use it.
 4. Choose what the map plays, and how long each frame stays.
 
 ## Good to know
@@ -35,9 +35,8 @@ A screen without pictures (the CYD, the Waveshare 3.5-inch, the Hosyond 4-inch) 
 - The map is Buienradar's own background for its radar, the very area of the radar frames: the Netherlands, Belgium
   and the land and sea around them, as one view. It does not zoom in on the place yet.
 - Buienradar takes a coordinate only in its shortest form (52.09, 52.1, 52; not 52,09, 52.10 or 52.091) and answers
-  any other with a redirect the app does not follow. The app sends what you type as it is, so the tile can only
-  check it and tell you. Choosing a zone or a person from Home Assistant needs a change in Tessera that lets a fetch
-  use an entity's coordinates.
+  any other with a redirect Tessera's app does not follow. So the screen asks for the forecast itself, with the
+  coordinates rounded to two decimals and written the way Buienradar takes them, whatever form you typed.
 
 ## Tried on
 
@@ -47,8 +46,10 @@ issue how it works on yours.
 
 ## Privacy
 
-Tessera's app, in your Home Assistant, asks Buienradar for the forecast every five minutes, with the latitude and
-longitude you filled in (`graphdata.buienradar.nl`). It fetches the radar frames (`processing-cdn.buienradar.nl`) and
+Tessera's app, in your Home Assistant, asks Buienradar for the forecast every five minutes while a tile shows it, with
+the latitude and longitude of the place (`graphdata.buienradar.nl`): the zone or person you chose, or the coordinates
+you typed, rounded to two decimals (about a kilometre). For a person, that is where they are, so Buienradar sees
+roughly where they go. It fetches the radar frames (`processing-cdn.buienradar.nl`) and
 the map under them (`cdn.buienradar.nl`), which are the same for everyone. Buienradar sees your Home Assistant's address
 on the internet and the place you chose. The screen itself connects to nothing outside your home.
 

@@ -1,6 +1,10 @@
 # What tools/preview.py shows (the plugins repository's docs/PREVIEW.md). Buienradar's times are UTC, so the moments
 # below are too. The map and radar pictures are real ones of Buienradar in preview/; run tools/bench_pictures.py first.
 time_zone: UTC
+states:
+  zone.home:
+    state: "0"
+    attributes: { friendly_name: Home, latitude: 52.0907, longitude: 5.1214 }
 tiles:
   - tile: rain
     name: Rain radar
@@ -16,7 +20,7 @@ tiles:
     options: { graph: false }
     sizes: [2x2]
   - tile: rain
-    name: Typo
+    name: Typed with a comma
     options: { latitude: "52,09", longitude: "5.12" }
     sizes: [2x1]
   - tile: rain

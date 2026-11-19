@@ -1,6 +1,12 @@
 # Changelog
 
 ## 0.6.0
+- **Your home, without typing coordinates.** A new option, **Place**, takes a zone, a person or a device tracker of
+  Home Assistant, and is your home zone by default. Choose a person and the rain follows them. Typed coordinates still
+  work and win when both are filled in; any form is fine now (52,09, 52.10), as the screen writes them the way Buienradar
+  takes them. A tile with coordinates typed in keeps them.
+- The tile asks Buienradar for its forecast itself, every five minutes while it shows, rounded to about a kilometre, as
+  before. Needs Tessera 0.4.98 or later (plugin API 0.27).
 - **Graph on the tile**, a new option: turn it off and a tile of 2x2 or larger shows the moving radar map alone, as
   large as it fits, with the frame's time in its corner. Good for a small screen such as the 4-inch, where the graph
   takes much of a 2x2. A tap still opens the card with the map and the graph. On a screen without pictures the graph

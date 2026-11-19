@@ -176,6 +176,46 @@ struct Forecast {
   bool covers(uint32_t t) const { return n > 0 && t + STEP / 2 >= at[0] && t < at[n - 1] + STEP; }
 };
 
+// ---- The forecasts by place ----
+//
+// The plugin asks Buienradar itself (plugin API 0.27, a fetch the screen asks for), with the place in the form
+// Buienradar takes: a point, at most two decimals, no zero at the end. It answers any other form with a redirect, which
+// the app does not follow, and the app writes a chosen zone's coordinates with exactly two decimals ("52.10"). So the
+// tiles and the card say which place they show (want_place), the plugin asks for each one every five minutes while it
+// is wanted, and they take its forecast when a new one came.
+struct Place {
+  char lat[12] = {}, lon[12] = {};   // as Buienradar takes them: "52.09", "5.1"
+  uint32_t wanted = 0;               // millis() when a tile or the card last wanted it
+  uint32_t asked = 0;                // millis() of the last ask, 0 never
+  uint32_t re = 0;                   // the ask whose answer is on its way
+  uint32_t version = 0;              // counts the answers, so a tile sees a new one
+  Forecast forecast;
+  bool used() const { return lat[0] != 0; }
+};
+static constexpr int PLACES = 4;
+static constexpr uint32_t FORGET_MS = 10 * 60 * 1000, ASK_MS = 5 * 60 * 1000, RETRY_MS = 60 * 1000;
+static Place places[PLACES];
+
+static Place *want_place(const std::string &lat, const std::string &lon) {
+  const uint32_t now = esphome::millis();
+  int free = -1;
+  for (int i = 0; i < PLACES; ++i) {
+    Place &p = places[i];
+    if (p.used() && lat == p.lat && lon == p.lon) {
+      p.wanted = now;
+      return &p;
+    }
+    // A free one, else the one wanted longest ago.
+    if (free < 0 || !p.used() || (places[free].used() && p.wanted - places[free].wanted > 0x80000000u)) free = i;
+  }
+  Place &p = places[free];
+  p = Place{};
+  snprintf(p.lat, sizeof(p.lat), "%s", lat.c_str());
+  snprintf(p.lon, sizeof(p.lon), "%s", lon.c_str());
+  p.wanted = now;
+  return &p;
+}
+
 // What the tile and the card say in words: whether it rains now and until when, or when it starts, and how hard.
 struct Summary {
   std::string head, sub;
@@ -457,6 +497,7 @@ class Map {
   static int height_of(int width) { return std::max(2, width * MAP_H / MAP_W); }
 
   void make(lv_obj_t *parent, int x, int y, int width, float latitude, float longitude) {
+    // The pictures first, then the place's dot over them, then the badge.
     x_ = x;
     y_ = y;
     w_ = width;
@@ -471,29 +512,34 @@ class Map {
     lv_obj_set_pos(radar_, x_, y_);
     lv_obj_set_size(radar_, w_, h_);
     // The place: a dot with a ring, where the latitude and longitude lie on the map.
-    const int ring = std::max(6, ui::mm(2)), dot = std::max(4, ring * 6 / 10);
+    ring_d_ = std::max(6, ui::mm(2));
+    dot_d_ = std::max(4, ring_d_ * 6 / 10);
     ring_ = ui::block(parent, theme::CAMERA_INK);
     dot_ = ui::block(parent, theme::ACCENT);
-    lv_obj_set_size(ring_, ring, ring);
-    lv_obj_set_size(dot_, dot, dot);
+    lv_obj_set_size(ring_, ring_d_, ring_d_);
+    lv_obj_set_size(dot_, dot_d_, dot_d_);
     lv_obj_set_style_radius(ring_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_radius(dot_, LV_RADIUS_CIRCLE, 0);
-    const float fx = (longitude - WEST) / (EAST - WEST);
-    const float fy = (mercator(NORTH) - mercator(latitude)) / (mercator(NORTH) - mercator(SOUTH));
-    const bool inside = fx >= 0 && fx < 1 && fy >= 0 && fy < 1;
-    shown(ring_, inside);
-    shown(dot_, inside);
-    if (inside) {
-      const int cx = x_ + static_cast<int>(fx * w_), cy = y_ + static_cast<int>(fy * h_);
-      lv_obj_set_pos(ring_, cx - ring / 2, cy - ring / 2);
-      lv_obj_set_pos(dot_, cx - dot / 2, cy - dot / 2);
-    }
+    place(latitude, longitude);
     // The frame's time, in the map's bottom left corner.
     badge_ = ui::block(parent, theme::CAMERA_PAGE);
     badge_text_ = ui::label(badge_, Font::BODY, theme::CAMERA_INK);
     lv_obj_set_pos(badge_text_, ui::px(6), 0);
     ui::set_picture(background_, BACKGROUND, Fit::COVER);
     colors();
+  }
+
+  // The dot at the place; none for a place not known yet (NaN) or off the map.
+  void place(float latitude, float longitude) {
+    const float fx = (longitude - WEST) / (EAST - WEST);
+    const float fy = (mercator(NORTH) - mercator(latitude)) / (mercator(NORTH) - mercator(SOUTH));
+    const bool inside = fx >= 0 && fx < 1 && fy >= 0 && fy < 1;   // false for NaN
+    shown(ring_, inside);
+    shown(dot_, inside);
+    if (!inside) return;
+    const int cx = x_ + static_cast<int>(fx * w_), cy = y_ + static_cast<int>(fy * h_);
+    lv_obj_set_pos(ring_, cx - ring_d_ / 2, cy - ring_d_ / 2);
+    lv_obj_set_pos(dot_, cx - dot_d_ / 2, cy - dot_d_ / 2);
   }
 
   void show(const tessera::Plugin *p, uint32_t newest, int frame, uint32_t now) {
@@ -527,7 +573,7 @@ class Map {
   static float mercator(float latitude) {
     return std::log(std::tan(3.14159265f / 4.0f + latitude * 3.14159265f / 360.0f));
   }
-  int x_ = 0, y_ = 0, w_ = 2, h_ = 2;
+  int x_ = 0, y_ = 0, w_ = 2, h_ = 2, ring_d_ = 6, dot_d_ = 4;
   lv_obj_t *background_ = nullptr, *radar_ = nullptr, *ring_ = nullptr, *dot_ = nullptr, *badge_ = nullptr,
            *badge_text_ = nullptr;
 };
@@ -542,20 +588,14 @@ class RainTile : public tessera::Tile {
 
   void create(const tessera::TileContext &c) override {
     tile_ = c.tile;
-    // The place, and whether Buienradar takes it as typed: if not, the tile says what to type instead (the app sends
-    // the words as they are, the plugin cannot change them).
+    // The place: typed, when both coordinates are (read leniently, "52,09" too); else the zone or person chosen, whose
+    // coordinates come with on_state. Until there is one the tile says to set it.
     std::string lat_typed, lon_typed;
-    latitude_ = coordinate(c.options["latitude"], 52.1f, lat_typed);
-    longitude_ = coordinate(c.options["longitude"], 5.18f, lon_typed);
-    problem_[0] = 0;
-    if (lat_typed != buienradar_form(latitude_))
-      snprintf(problem_, sizeof(problem_), "%s",
-               tessera::fill(plugin_->text("fix_latitude"), "value", buienradar_form(latitude_)).c_str());
-    else if (lon_typed != buienradar_form(longitude_))
-      snprintf(problem_, sizeof(problem_), "%s",
-               tessera::fill(plugin_->text("fix_longitude"), "value", buienradar_form(longitude_)).c_str());
-    else if (latitude_ < SOUTH || latitude_ > NORTH || longitude_ < WEST || longitude_ > EAST)
-      snprintf(problem_, sizeof(problem_), "%s", plugin_->text("outside"));
+    const float lat = coordinate(c.options["latitude"], NAN, lat_typed);
+    const float lon = coordinate(c.options["longitude"], NAN, lon_typed);
+    typed_ = !std::isnan(lat) && !std::isnan(lon);
+    if (typed_) set_place(lat, lon);
+    else snprintf(forecast_.wait, sizeof(forecast_.wait), "%s", "not_filled");
     pace_ = std::max(1, std::min(10, c.options["pace"] | 2));
     const std::string play = c.options["play"] | "all";
     play_ = play == "still" ? Play::STILL : play == "forecast" ? Play::FORECAST : Play::ALL;
@@ -567,6 +607,7 @@ class RainTile : public tessera::Tile {
     frame_ = first();
 
     const int w = c.width, h = c.height, gap = ui::px(6);
+    // The map's dot follows the place (set_place); NaN until it is known.
     const int title = ui::line_height(Font::TITLE), body = ui::line_height(Font::BODY);
     if (map_ && !graph) {
       // The map alone, as large as the tile takes it, in the middle; its corner says the frame's time.
@@ -620,24 +661,40 @@ class RainTile : public tessera::Tile {
     }
   }
 
+  // The chosen place's entity: its coordinates, sent again whenever they change (a person on the move).
   void on_state(JsonObjectConst data) override {
-    forecast_.read(data, now_ ? now_ : tessera::epoch());
-    // The top bar's item says what this tile knows: the forecast, when it answered for a place Buienradar takes.
-    if (forecast_.n && !forecast_.stale && !problem_[0]) {
-      Latest &latest = plugin_->latest;
-      latest.n = std::min(forecast_.n, Latest::POINTS);
-      for (int i = 0; i < latest.n; ++i) {
-        latest.at[i] = forecast_.at[i];
-        latest.mm[i] = forecast_.mm[i];
-      }
-      latest.received = tessera::epoch();
-    }
+    if (typed_) return;
+    JsonObjectConst a = data["entities"]["place"]["attributes"];
+    const float lat = a["latitude"] | NAN, lon = a["longitude"] | NAN;
+    if (std::isnan(lat) || std::isnan(lon)) return;   // kept: a person whose place is unknown for a while
+    if (lat == latitude_ && lon == longitude_) return;
+    set_place(lat, lon);
     paint();
   }
 
   void on_tick(uint32_t epoch) override {
     now_ = epoch;
     bool changed = false;
+    // The forecast of the place, when the plugin has a new one.
+    if (known_ && !problem_[0]) {
+      const Place *p = want_place(buienradar_form(latitude_), buienradar_form(longitude_));
+      if (p != seen_ || p->version != version_) {
+        seen_ = p;
+        version_ = p->version;
+        if (p->version) forecast_ = p->forecast;
+        changed = true;
+        // The top bar's item says what this tile knows: the forecast, when Buienradar answered.
+        if (forecast_.n && !forecast_.stale) {
+          Latest &latest = plugin_->latest;
+          latest.n = std::min(forecast_.n, Latest::POINTS);
+          for (int i = 0; i < latest.n; ++i) {
+            latest.at[i] = forecast_.at[i];
+            latest.mm[i] = forecast_.mm[i];
+          }
+          latest.received = tessera::epoch();
+        }
+      }
+    }
     // While Buienradar does not answer (the forecast is older), the map keeps the frames it has: the app still has
     // those, newer ones would not come and would leave the map blank.
     const uint32_t newest = newest_ && forecast_.stale ? newest_
@@ -675,6 +732,7 @@ class RainTile : public tessera::Tile {
   void on_tap() override {
     plugin_->handoff.latitude = latitude_;
     plugin_->handoff.longitude = longitude_;
+    plugin_->handoff.known = known_;
     plugin_->handoff.frame = map_ ? frame_ : 0;
     plugin_->handoff.pace = pace_;
     snprintf(plugin_->handoff.problem, sizeof(plugin_->handoff.problem), "%s", problem_);
@@ -686,6 +744,20 @@ class RainTile : public tessera::Tile {
   enum class Play : uint8_t { ALL, FORECAST, STILL };
 
   int first() const { return play_ == Play::ALL ? FIRST_FRAME : 0; }
+
+  // A place known now (typed, or the chosen entity's): whether Buienradar covers it, and the map's dot. Another place
+  // starts with no forecast, so a forecast is never shown for the wrong place.
+  void set_place(float lat, float lon) {
+    latitude_ = lat;
+    longitude_ = lon;
+    known_ = true;
+    problem_[0] = 0;
+    if (lat < SOUTH || lat > NORTH || lon < WEST || lon > EAST)
+      snprintf(problem_, sizeof(problem_), "%s", plugin_->text("outside"));
+    forecast_ = Forecast{};
+    seen_ = nullptr;
+    if (map_) map_view_.place(lat, lon);
+  }
 
   // The words in a narrow column beside the map: each over as many lines as it needs.
   void column(lv_obj_t *parent, int x, int y, int w, int h) {
@@ -746,8 +818,11 @@ class RainTile : public tessera::Tile {
 
   Buienradar *plugin_;
   int tile_ = -1;
-  float latitude_ = 52.1f, longitude_ = 5.2f;
-  char problem_[96] = {};   // what to type instead, when Buienradar would not take the place as typed
+  float latitude_ = NAN, longitude_ = NAN;
+  bool typed_ = false, known_ = false;   // typed_: the coordinates typed in the options win over the chosen entity
+  const Place *seen_ = nullptr;          // the place whose forecast the tile shows, and its answer's number
+  uint32_t version_ = 0;
+  char problem_[96] = {};   // why there is no forecast: the place lies outside Buienradar's map
   int pace_ = 2;
   Play play_ = Play::ALL;
   bool map_ = false, one_cell_ = false, fit_words_ = false;   // fit_words_: the words sized to their length
@@ -773,6 +848,12 @@ class RadarCard : public tessera::Card {
 
   void open(const tessera::CardContext &c) override {
     const Handoff &from = plugin_->handoff;
+    // The tile's place: the card asks for its forecast as the tile does, and has the tile's at once.
+    known_ = from.known;
+    if (known_) {
+      snprintf(lat_, sizeof(lat_), "%s", buienradar_form(from.latitude).c_str());
+      snprintf(lon_, sizeof(lon_), "%s", buienradar_form(from.longitude).c_str());
+    }
     frame_ = std::max(FIRST_FRAME, std::min(LAST_FRAME, from.frame));
     pace_ = from.pace;
     const int w = c.width, h = c.height, gap = ui::px(10);
@@ -886,14 +967,21 @@ class RadarCard : public tessera::Card {
     return k <= 2 && along - k * (key_ + ui::px(8)) < key_ ? k : -1;
   }
 
-  void on_state(JsonObjectConst data) override {
-    forecast_.read(data, now_ ? now_ : tessera::epoch());
-    paint();
-  }
-
   void on_tick(uint32_t epoch) override {
     now_ = epoch;
     bool changed = false;
+    if (known_ && !plugin_->handoff.problem[0]) {
+      const Place *p = want_place(lat_, lon_);
+      if (p != seen_ || p->version != version_) {
+        seen_ = p;
+        version_ = p->version;
+        if (p->version) forecast_ = p->forecast;
+        changed = true;
+      }
+    } else if (!known_ && !forecast_.wait[0]) {
+      snprintf(forecast_.wait, sizeof(forecast_.wait), "%s", "not_filled");
+      changed = true;
+    }
     // While Buienradar does not answer (the forecast is older), the map keeps the frames it has: the app still has
     // those, newer ones would not come and would leave the map blank.
     const uint32_t newest = newest_ && forecast_.stale ? newest_
@@ -986,6 +1074,10 @@ class RadarCard : public tessera::Card {
   int frame_ = 0, pace_ = 2, key_ = 1, keys_x_ = 0, keys_y_ = 0;
   bool has_map_ = false, playing_ = true;   // the card plays when it opens, as the tile's map does
   uint32_t now_ = 0, newest_ = 0, minute_ = 0, moved_ = 0;
+  bool known_ = false;
+  char lat_[12] = {}, lon_[12] = {};   // the place as Buienradar takes it
+  const Place *seen_ = nullptr;
+  uint32_t version_ = 0;
   Forecast forecast_;
   Graph graph_;
   Map map_view_;
@@ -997,6 +1089,49 @@ void Buienradar::setup() {
   add_tile("rain", [this]() { return new RainTile(this); });
   add_card("radar", [this]() { return new RadarCard(this); }, true);
   add_bar_item("rain", [this]() { return bar(); });
+}
+
+// Every place a tile or the card wanted in the last ten minutes is asked for every five, or after a minute when the
+// last ask got no forecast. The app keeps the answers for the fetch's `every`, so tiles of one place on several screens
+// cost Buienradar one question.
+void Buienradar::on_interval(uint32_t now_ms) {
+  for (Place &p : places) {
+    if (!p.used()) continue;
+    if (now_ms - p.wanted > FORGET_MS) {
+      p = Place{};
+      continue;
+    }
+    const bool good = p.forecast.n > 0 && !p.forecast.stale;
+    if (p.asked && now_ms - p.asked < (good ? ASK_MS : RETRY_MS)) continue;
+    JsonDocument request;
+    request["ask"] = "fetch:rain";
+    request["data"]["lat"] = p.lat;
+    request["data"]["lon"] = p.lon;
+    p.re = tessera::send(this, request.as<JsonObjectConst>());
+    p.asked = now_ms ? now_ms : 1;
+  }
+}
+
+// {"re", "ok": true, "result": {"items": [...]}} or {"re", "ok": false, "error": "..."}: the forecast of its place.
+// Without one the place keeps the forecast it had, said to be older, while that still reaches past now.
+void Buienradar::on_message(JsonObjectConst message) {
+  const uint32_t re = message["re"] | 0u;
+  if (!re) return;
+  for (Place &p : places) {
+    if (!p.used() || p.re != re) continue;
+    p.re = 0;
+    const uint32_t now = tessera::epoch();
+    if (message["ok"] | false) {
+      p.forecast.read(message["result"], now);
+    } else {
+      const std::string error = message["error"] | "";
+      JsonDocument why;
+      why["wait"] = error == "not_filled" ? "not_filled" : error == "too_often" ? "asking" : "failed";
+      p.forecast.read(why.as<JsonObjectConst>(), now);
+    }
+    ++p.version;
+    return;
+  }
 }
 
 // ---- The top bar's item ----

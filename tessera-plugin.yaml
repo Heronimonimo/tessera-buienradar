@@ -3,7 +3,7 @@
 # repository's docs/MANIFEST.md.
 id: buienradar
 version: 0.6.0
-api: "0.14"
+api: "0.27"
 icon: weather-pouring
 maintainer: Heronimonimo
 license: MIT
@@ -31,14 +31,17 @@ tiles:
     memory: 4900
     # The map and the radar frame over it.
     pictures: 2
-    data: rain
     example: tile_example
-    # The place as typed: the app puts it in Buienradar's URL as it is, and Buienradar answers a coordinate not in
-    # its shortest form (52,09, 52.10, 52.091) with a redirect the app does not follow. The tile checks the words and
-    # says what to type instead; it cannot change what the app sends.
+    # The place: a zone, a person or a tracker of Home Assistant (home by default), or coordinates typed, which win.
+    # The tile asks for the forecast itself (the fetch rain, `asked`): Buienradar takes a coordinate only in its
+    # shortest form (52.09, 52.1; not 52.10) and answers any other with a redirect the app does not follow, while the
+    # app writes a chosen entity's coordinates with a fixed number of decimals. The screen writes them as Buienradar
+    # takes them, rounded to two decimals (about a kilometre).
     options:
-      - { id: latitude, kind: text, default: "52.1", label: latitude, hint: latitude_hint }
-      - { id: longitude, kind: text, default: "5.18", label: longitude, hint: longitude_hint }
+      - { id: place, kind: entity, domains: [zone, person, device_tracker], attributes: [latitude, longitude],
+          default: zone.home, label: place, hint: place_hint }
+      - { id: latitude, kind: text, default: "", label: latitude, hint: latitude_hint }
+      - { id: longitude, kind: text, default: "", label: longitude, hint: longitude_hint }
       - { id: map, kind: toggle, default: true, label: map, hint: map_hint }
       - { id: graph, kind: toggle, default: true, label: graph, hint: graph_hint }
       - { id: play, kind: choice, default: all, label: play, hint: play_hint,
@@ -63,7 +66,8 @@ fetch:
   # Buienradar's rain for one point, every five minutes from about twenty minutes ago to two and a half hours ahead,
   # in millimetres an hour. The times are UTC.
   - id: rain
-    url: https://graphdata.buienradar.nl/2.0/forecast/geo/RainHistoryForecast?lat={latitude}&lon={longitude}
+    asked: [lat, lon]
+    url: https://graphdata.buienradar.nl/2.0/forecast/geo/RainHistoryForecast?lat={lat}&lon={lon}
     every: 5m
     map:
       items: "$.forecasts[*]"

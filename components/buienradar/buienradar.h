@@ -8,6 +8,7 @@ namespace esphome::buienradar {
 // What a tile hands the card it opens: the card gets the tile's data, not its options or the frame it was showing.
 struct Handoff {
   float latitude = 52.1f, longitude = 5.2f;
+  bool known = false;  // the tile knew its place
   int frame = 0;      // the map's frame, 0 for now
   int pace = 2;       // seconds per frame
   char problem[96] = {};   // what to type for the place, when Buienradar would not take it as typed
@@ -30,6 +31,9 @@ class Buienradar : public Component, public tessera::Plugin {
   void setup() override;
   float get_setup_priority() const override { return setup_priority::DATA; }
   bool settings(tessera::SettingsPage &page) override;
+  // Asks Buienradar for the forecast of every place a tile or the card shows, and takes its answers (buienradar.cpp).
+  void on_interval(uint32_t now_ms) override;
+  void on_message(JsonObjectConst message) override;
 
   void set_bar_when(select::Select *s) { bar_when_ = s; }
   void set_bar_words(select::Select *s) { bar_words_ = s; }
