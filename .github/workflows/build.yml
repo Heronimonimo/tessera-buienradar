@@ -1,0 +1,93 @@
+# A whole firmware with the plugin, as the Tessera app builds it: Tessera's screen package at its newest release (or the
+# ref given), the ESPHome of that release's app (its Dockerfile), and this plugin beside it. Two screens: the CYD, an
+# ESP32 with 4 MB of flash and no PSRAM, where flash and memory are tightest, and the Guition 10.1-inch V3, an ESP32-P4
+# with PSRAM. Every Monday as well, so a Tessera release that breaks the plugin shows within a week. The preview bench
+# builds for a computer; only this build shows that the plugin compiles and fits for the chips themselves.
+name: build
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      tessera_ref:
+        description: Tessera ref to build against (a screens-v* tag or a branch); empty for the newest release
+        default: ""
+      esphome:
+        description: ESPHome version; empty for the one of that Tessera's app
+        default: ""
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        board: [cyd, jc8012p4a1v3]
+    name: firmware (${{ matrix.board }})
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: plugin }
+      - name: Tessera release and ESPHome version
+        id: versions
+        env:
+          WANT_REF: ${{ inputs.tessera_ref }}
+          WANT_ESPHOME: ${{ inputs.esphome }}
+        run: |
+          ref="$WANT_REF"
+          if [ -z "$ref" ]; then
+            ref=$(git ls-remote --tags --refs https://github.com/MaxGramser/homeassistant_espscreen 'screens-v*' \
+                  | sed 's#.*refs/tags/##' | sort -V | tail -1)
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "Tessera: $ref"
+      - uses: actions/checkout@v4
+        with:
+          repository: MaxGramser/homeassistant_espscreen
+          ref: ${{ steps.versions.outputs.ref }}
+          path: tessera
+      - name: ESPHome of that Tessera
+        id: esphome
+        env:
+          WANT_ESPHOME: ${{ inputs.esphome }}
+        run: |
+          version="$WANT_ESPHOME"
+          [ -n "$version" ] || version=$(sed -n 's#^FROM ghcr.io/esphome/esphome:\([0-9.]*\).*#\1#p' tessera/screen_manager/Dockerfile | head -1)
+          [ -n "$version" ] || { echo "No ESPHome version in Tessera's Dockerfile"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "ESPHome: $version"
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - run: python -m pip install "esphome==${{ steps.esphome.outputs.version }}" pyyaml
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/esphome
+          key: esphome-${{ runner.os }}-${{ matrix.board }}-${{ steps.esphome.outputs.version }}-${{ steps.versions.outputs.ref }}
+          restore-keys: esphome-${{ runner.os }}-${{ matrix.board }}-${{ steps.esphome.outputs.version }}-
+      - name: Screen with the plugin
+        working-directory: tessera/checkout
+        run: |
+          id=$(python -c "import yaml; print(yaml.safe_load(open('../../plugin/tessera-plugin.yaml'))['id'])")
+          # Throwaway secrets: this firmware is only built, never flashed.
+          cat > secrets.yaml <<EOF
+          wifi_ssid: "ci"
+          wifi_password: "ci-password"
+          api_encryption_key: "$(head -c 32 /dev/urandom | base64)"
+          ota_password: "ci-ota"
+          ap_password: "ci-ap-password"
+          EOF
+          # As Tessera writes a screen's plugins file (docs/TESTING.md in tessera-plugins, "A build on your own computer").
+          {
+            echo "packages:"
+            echo "  screen: !include ${{ matrix.board }}.yaml"
+            echo "  plugin_${id}: !include ../../plugin/plugin.yaml"
+            echo "external_components:"
+            echo "  - source: { type: local, path: ../../plugin/components }"
+          } > ci-plugin.yaml
+          cat ci-plugin.yaml
+      - name: esphome compile
+        working-directory: tessera/checkout
+        run: esphome compile ci-plugin.yaml

@@ -1,0 +1,24 @@
+# Every push and pull request: the plugin passes the Tessera app's own manifest check and the rules of tools/check.py
+# in the plugins repository, the same check its community listing runs at every release. Every Monday as well, so a
+# new rule of the plugins repository shows before the next release does.
+name: check
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "47 4 * * 1"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: plugin }
+      - uses: actions/checkout@v4
+        with: { repository: MaxGramser/tessera-plugins, path: tessera-plugins }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - run: python -m pip install pyyaml
+      - run: python tessera-plugins/tools/check.py plugin
